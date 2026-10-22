@@ -2,8 +2,9 @@ PFM2_VERSION_NUMBER=2.21b
 PFM2_VERSION:=\"${PFM2_VERSION_NUMBER}\"
 
 # Define you GCCPATH HERE
-#GCC_PATH:=/home/xavier/git/preenfm2/gcc-arm-none-eabi-4_7-2014q2/bin
-GCC_PATH:=/home/xavier/dev/gcc-arm-none-eabi-4_7-2014q2/bin
+# GCC_PATH: directory holding arm-none-eabi-*. Defaults to the toolchain found on PATH.
+# Override on the command line if needed: make GCC_PATH=/path/to/bin pfm
+GCC_PATH?=$(patsubst %/,%,$(dir $(shell which arm-none-eabi-gcc)))
 
 ifeq ($(MAKECMDGOALS),pfm)
 BUILD_PREFIX:=build/p2_${PFM2_VERSION_NUMBER}
@@ -172,11 +173,11 @@ SMALLBINOPTS := -mfpu=fpv4-sp-d16 -ffunction-sections -fdata-sections -fno-rtti 
 #
 DEFINE := -DPFM2_VERSION=${PFM2_VERSION} -DPFM2_BOOTLOADER_VERSION=${PFM2_BOOTLOADER_VERSION}
 
-CFLAGS = -Ofast $(INCLUDESDIR) -c -fno-common   -g  -mthumb -mcpu=cortex-m4 -mfloat-abi=hard $(SMALLBINOPTS) $(DEFINE) -fsigned-char
+CFLAGS = -Ofast $(INCLUDESDIR) -c -fno-common   -g  -mthumb -mcpu=cortex-m4 -mfloat-abi=hard $(SMALLBINOPTS) $(DEFINE) -fsigned-char -Wno-narrowing
 
 AFLAGS  = -ahls -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16
-LFLAGS  = -Tlinker/stm32f4xx.ld  -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -gc-sections    --specs=nano.specs
-LFLAGS_BOOTLOADER  = -Tlinker_bootloader/stm32f4xx.ld  -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -gc-sections --specs=nano.specs
+LFLAGS  = -Tlinker/stm32f4xx.ld  -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -Wl,--gc-sections    --specs=nano.specs
+LFLAGS_BOOTLOADER  = -Tlinker_bootloader/stm32f4xx.ld  -mthumb -mcpu=cortex-m4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 -Wl,--gc-sections --specs=nano.specs
 CPFLAGS = -Obinary
 
 STARTUP := build/startup_firmware.o

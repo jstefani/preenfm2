@@ -140,7 +140,7 @@ SECTIONS
 	} > RAM
 
     /* Now CCM load area */
-    . = __etext + SIZEOF(.data) + SIZEOF(.jcr);
+    . = __etext + SIZEOF(.data);
     _siccm = .;
 
     /* For arrays */

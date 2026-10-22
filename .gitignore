@@ -17,3 +17,4 @@ linker/startup_stm32f4xx.lst
 *.zip
 gcc-arm**/**
 
+.binfirmware
