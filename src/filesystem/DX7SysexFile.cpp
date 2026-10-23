@@ -15,30 +15,41 @@ uint8_t dx7PackedPatch[DX7_PACKED_PATCH_SIZED];
 DX7SysexFile::DX7SysexFile() {
 	numberOfFilesMax = NUMBEROFDX7BANKS;
 	myFiles = dx7Bank;
-	const char* name = "*Random*";
-	int k = 0;
-	for (; name[k] != 0; k++) {
-		randomBank.name[k] = name[k];
+	for (int b = 0; b < DX7_RANDOM_MODES; b++) {
+		const char* name = dx7RandomBankName[b];
+		int k = 0;
+		for (; name[k] != 0 && k < 12; k++) {
+			randomBank[b].name[k] = name[k];
+		}
+		for (; k < 13; k++) {
+			randomBank[b].name[k] = 0;
+		}
+		randomBank[b].fileType = FILE_OK;
+		// Fixed seed until the bank is selected : deterministic at boot
+		randomSeed[b] = 0x2545F491 + b;
 	}
-	for (; k < 13; k++) {
-		randomBank.name[k] = 0;
-	}
-	randomBank.fileType = FILE_OK;
-	// Fixed seed until the bank is selected : deterministic at boot
-	randomSeed = 0x2545F491;
 }
 
 const struct PFM2File* DX7SysexFile::getFile(int fileNumber) {
-	if (fileNumber == 0) {
-		return &randomBank;
+	if (fileNumber >= 0 && fileNumber < DX7_RANDOM_MODES) {
+		return &randomBank[fileNumber];
 	}
-	return PreenFMFileType::getFile(fileNumber - 1);
+	return PreenFMFileType::getFile(fileNumber - DX7_RANDOM_MODES);
 }
 
-void DX7SysexFile::newRandomBank() {
-	randomSeed = RNG_GetRandomNumber();
-	if (randomSeed == 0) {
-		randomSeed = 1;
+int DX7SysexFile::randomBankIndex(const struct PFM2File* bank) {
+	for (int b = 0; b < DX7_RANDOM_MODES; b++) {
+		if (bank == &randomBank[b]) {
+			return b;
+		}
+	}
+	return -1;
+}
+
+void DX7SysexFile::newRandomBank(int b) {
+	randomSeed[b] = RNG_GetRandomNumber();
+	if (randomSeed[b] == 0) {
+		randomSeed[b] = 1;
 	}
 }
 
@@ -53,8 +64,9 @@ uint8_t* DX7SysexFile::dx7LoadPatch(const struct PFM2File* bank, int patchNumber
     if (patchNumber > 31) {
     	return (uint8_t*)0;
     }
-    if (bank == &randomBank) {
-        dx7GenerateRandomPatch(randomSeed, patchNumber, dx7PackedPatch);
+    int randomIndex = randomBankIndex(bank);
+    if (randomIndex >= 0) {
+        dx7GenerateRandomPatch(randomIndex, randomSeed[randomIndex], patchNumber, dx7PackedPatch);
         return dx7PackedPatch;
     }
     const char* fullBankName = getFullName(bank->name);

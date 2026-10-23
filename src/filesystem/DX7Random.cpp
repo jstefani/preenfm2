@@ -74,18 +74,7 @@ void pack(const uint8_t* u, uint8_t* p) {
 
 }
 
-void dx7GenerateRandomPatch(uint32_t seed, int index, uint8_t* packed) {
-    Rng rng;
-    rng.s = (seed ^ ((uint32_t)(index + 1) * 0x9E3779B9u)) | 1;
-    for (int k = 0; k < 4; k++) {
-        rng.next();
-    }
-
-    uint8_t u[156];
-    for (int k = 0; k < 156; k++) {
-        u[k] = 0;
-    }
-
+static void generateTame(Rng& rng, int index, uint8_t* u) {
     int algo = rng.range(32);
     int character = rng.range(NUMBER_OF_CHARACTERS);
 
@@ -181,6 +170,150 @@ void dx7GenerateRandomPatch(uint32_t seed, int index, uint8_t* packed) {
     name[7] = ' ';
     name[8] = ' ';
     name[9] = ' ';
+}
+
+// Every parameter drawn over its full legal range. The only guard is that
+// at least one carrier is loud and actually opens, so a note is heard.
+static void generateChaos(Rng& rng, int index, uint8_t* u, bool percussive) {
+    int algo = rng.range(32);
+    int loudestCarrier = -1;
+    int loudestLevel = -1;
+
+    for (int slot = 0; slot < 6; slot++) {
+        uint8_t* o = &u[slot * 21];
+        bool carrier = msfa::FmCore::isCarrier(algo, slot);
+        for (int i = 0; i < 8; i++) {
+            o[i] = rng.range(100);                 // rates 1-4, levels 1-4
+        }
+        if (percussive) {
+            // fast attack, decay to little or nothing, short release
+            o[0] = rng.between(85, 99);            // R1
+            o[1] = rng.between(55, 85);            // R2 : 50 ms .. 1 s, not a click
+            o[2] = rng.between(50, 80);            // R3
+            o[3] = rng.between(45, 99);            // R4
+            o[4] = carrier ? 99 : rng.between(70, 99);   // L1
+            o[6] = rng.range(carrier ? 25 : 60);   // L3 : the sustain is low
+            o[7] = carrier ? 0 : rng.range(30);    // L4
+        }
+        o[8] = rng.range(100);                     // break point
+        o[9] = rng.range(100);                     // left depth
+        o[10] = rng.range(100);                    // right depth
+        o[11] = rng.range(4);                      // left curve
+        o[12] = rng.range(4);                      // right curve
+        o[13] = rng.range(8);                      // rate scaling
+        o[14] = rng.range(4);                      // amp mod sens
+        o[15] = rng.range(8);                      // velocity sens
+        o[16] = rng.range(100);                    // output level
+        o[17] = rng.chance(15) ? 1 : 0;            // fixed frequency mode, now and then
+        o[18] = rng.range(32);                     // coarse
+        o[19] = rng.range(100);                    // fine
+        o[20] = rng.range(15);                     // detune
+        if (carrier) {
+            o[7] = 0;                              // L4 : carriers release to silence, no droning voices
+            if (o[16] > loudestLevel) {
+                loudestLevel = o[16];
+                loudestCarrier = slot;
+            }
+        }
+    }
+    // Silence guard on the loudest carrier : it must be heard at any note
+    if (loudestCarrier >= 0) {
+        uint8_t* o = &u[loudestCarrier * 21];
+        if (o[0] < 50) {
+            o[0] = rng.between(50, 99);            // R1 : the attack happens
+        }
+        if (o[4] < 80) {
+            o[4] = rng.between(80, 99);            // L1 : and reaches something
+        }
+        if (o[5] < 60) {
+            o[5] = rng.between(60, 99);            // L2 : and does not vanish right after
+        }
+        if (!percussive && o[6] < 10 && o[2] > 85) {
+            o[2] = rng.between(40, 85);            // R3 : a decay, not a click
+        }
+        o[8] = rng.between(30, 50);                // break point near the middle
+        if (o[9] > 15) {
+            o[9] = rng.range(16);                  // key level scaling kept mild
+        }
+        if (o[10] > 15) {
+            o[10] = rng.range(16);
+        }
+        if (o[13] > 3) {
+            o[13] = rng.range(4);                  // rate scaling
+        }
+        if (o[15] > 4) {
+            o[15] = rng.range(5);                  // velocity sens
+        }
+        if (o[16] < 80) {
+            o[16] = rng.between(80, 99);           // output level
+        }
+        o[17] = 0;                                 // on the keyboard, not fixed
+    }
+
+    // Pitch EG : free within about +-2 octaves, percussive favours fast blips
+    for (int i = 0; i < 4; i++) {
+        u[126 + i] = percussive ? rng.between(60, 99) : rng.range(100);
+        u[130 + i] = rng.between(25, 75);
+    }
+    u[133] = 50;                                   // ends on pitch
+    if (!percussive && rng.chance(50)) {
+        // half of the time : keep the pitch sane
+        for (int i = 0; i < 4; i++) {
+            u[130 + i] = 50;
+        }
+    }
+
+    u[134] = algo;
+    u[135] = rng.range(8);                         // feedback
+    u[136] = rng.range(2);                         // osc key sync
+    u[137] = rng.range(100);                       // LFO speed
+    u[138] = rng.range(100);                       // LFO delay
+    u[139] = rng.chance(50) ? rng.range(100) : rng.range(20);   // pitch mod depth
+    u[140] = rng.range(100);                       // amp mod depth
+    u[141] = rng.range(2);                         // LFO key sync
+    u[142] = rng.range(6);                         // LFO wave
+    u[143] = rng.range(8);                         // pitch mod sens
+    u[144] = rng.chance(70) ? 24 : rng.between(12, 36);   // transpose
+
+    // Name : "C01 XKQ   " / "P01 XKQ   "
+    char* name = (char*)&u[145];
+    name[0] = percussive ? 'P' : 'C';
+    name[1] = '0' + ((index + 1) / 10);
+    name[2] = '0' + ((index + 1) % 10);
+    name[3] = ' ';
+    for (int k = 4; k < 7; k++) {
+        name[k] = 'A' + rng.range(26);
+    }
+    name[7] = ' ';
+    name[8] = ' ';
+    name[9] = ' ';
+}
+
+const char* const dx7RandomBankName[DX7_RANDOM_MODES] = { "*Random*", "*Chaos*", "*ChaosPrc*" };
+
+void dx7GenerateRandomPatch(int mode, uint32_t seed, int index, uint8_t* packed) {
+    Rng rng;
+    rng.s = (seed ^ ((uint32_t)(index + 1) * 0x9E3779B9u) ^ ((uint32_t)mode * 0x85EBCA6Bu)) | 1;
+    for (int k = 0; k < 4; k++) {
+        rng.next();
+    }
+
+    uint8_t u[156];
+    for (int k = 0; k < 156; k++) {
+        u[k] = 0;
+    }
+
+    switch (mode) {
+    case DX7_RANDOM_CHAOS:
+        generateChaos(rng, index, u, false);
+        break;
+    case DX7_RANDOM_CHAOS_PERC:
+        generateChaos(rng, index, u, true);
+        break;
+    default:
+        generateTame(rng, index, u);
+        break;
+    }
 
     pack(u, packed);
 }
