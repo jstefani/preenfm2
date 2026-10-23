@@ -112,6 +112,7 @@ SRC_FIRMWARE:=src/PreenFM.cpp \
 	src/midipal/note_stack.cpp \
 	src/midipal/event_scheduler.cpp \
 	src/synth/Dx7Engine.cpp \
+	src/synth/Dx7Params.cpp \
 	src/msfa/msfa_sin.cpp \
 	src/msfa/msfa_exp2.cpp \
 	src/msfa/msfa_freqlut.cpp \

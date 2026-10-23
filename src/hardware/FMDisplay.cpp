@@ -15,6 +15,7 @@
  */
 
 #include "FMDisplay.h"
+#include "Dx7Params.h"
 
 #define NULL 0
 extern const char* lfoSeqMidiClock[];
@@ -499,9 +500,87 @@ void FMDisplay::updateEncoderName(int row, int encoder) {
     lcd->print(paramRow->paramName[encoder]);
 }
 
+void FMDisplay::dx7DisplayRowName(int row) {
+    const Dx7RowDef* def = dx7RowDef(row);
+    lcd->setCursor(0, 1);
+    if (dx7RowIsOperator(row)) {
+        lcd->print("Op");
+        lcd->print(dx7RowOperator(row) + 1);
+        lcd->print(' ');
+    }
+    lcd->print(def->name);
+}
+
+void FMDisplay::dx7UpdateEncoderName(int row, int encoder) {
+    const Dx7RowDef* def = dx7RowDef(row);
+    lcd->setCursor(encoder * 5, 2);
+    lcd->print(def->encoders[encoder].name);
+}
+
+void FMDisplay::dx7UpdateEncoderValue(int row, int encoder) {
+    const Dx7EncoderDef& enc = dx7RowDef(row)->encoders[encoder];
+    lcd->setCursor(encoder * 5, 3);
+    if (enc.index == DX7_INDEX_NONE) {
+        lcd->print("    ");
+        return;
+    }
+    int value = this->synthState->getDx7Value(row, encoder);
+    if (enc.valueNames != 0) {
+        lcd->print(enc.valueNames[value]);
+    } else {
+        printValueWithSpace(value + enc.displayOffset);
+    }
+}
+
+void FMDisplay::newDx7ParamValue(int timbre, int row, int encoder, int index, int value) {
+    if (wakeUpFromScreenSaver()) {
+        return;
+    }
+    checkPresetModified(timbre);
+    if (timbre == currentTimbre && this->synthState->getSynthMode() == SYNTH_MODE_EDIT && row == this->displayedRow) {
+        dx7UpdateEncoderValue(row, encoder);
+    }
+}
+
 void FMDisplay::refreshAllScreenByStep() {
     switch (this->synthState->fullState.synthMode) {
     case SYNTH_MODE_EDIT:
+        if (unlikely(this->synthState->isDx7Edit())) {
+            // DX7 engine : its own rows
+            int row = this->synthState->getDx7Row();
+            switch (refreshStatus) {
+            case 12:
+                lcd->setCursor(3,1);
+                lcd->print("               ");
+                break;
+            case 11:
+                for (int k=0; k<4; k++) {
+                    lcd->setCursor(4+k*5,2);
+                    lcd->print(' ');
+                }
+                break;
+            case 10:
+                for (int k=0; k<4; k++) {
+                    lcd->setCursor(4+k*5,3);
+                    lcd->print(' ');
+                }
+                break;
+            case 9:
+                dx7DisplayRowName(row);
+                break;
+            case 5:
+            case 6:
+            case 7:
+            case 8:
+                dx7UpdateEncoderName(row, refreshStatus - 5);
+                break;
+            default:
+                dx7UpdateEncoderValue(row, refreshStatus - 1);
+                break;
+            }
+            refreshStatus--;
+            return;
+        }
         switch (refreshStatus) {
         case 12:
             lcd->setCursor(3,1);
@@ -721,6 +800,14 @@ void FMDisplay::newParamValue(int timbre, int currentRow, int encoder, Parameter
         return;
     }
     checkPresetModified(timbre);
+    if (unlikely(this->synthState->isTimbreDx7(timbre))) {
+        // DX7 timbre : only the voice count is shared with the native rows
+        if (timbre == currentTimbre && this->synthState->getSynthMode() == SYNTH_MODE_EDIT
+                && currentRow == ROW_ENGINE && encoder == ENCODER_ENGINE_VOICE && this->displayedRow == DX7_ROW_ENGINE) {
+            dx7UpdateEncoderValue(DX7_ROW_ENGINE, 3);
+        }
+        return;
+    }
 
     if (this->synthState->getSynthMode() == SYNTH_MODE_EDIT) {
         if (unlikely(currentRow != this->displayedRow)) {

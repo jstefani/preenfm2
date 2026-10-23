@@ -64,8 +64,9 @@ public:
     void allSoundOff();
     void allSoundOff(int timbre);
     void allNoteOffQuick();
-    // DX7 engine (msfa) : a DX7 sysex patch was loaded into timbre
-    void newDx7Patch(int timbre, uint8_t* packedPatch);
+    // DX7 engine (msfa) : a DX7 voice was loaded into timbre / edited
+    void newDx7Patch(int timbre, uint8_t* unpackedVoice);
+    void newDx7ParamValue(int timbre, int row, int encoder, int index, int value);
     bool isPlaying();
     void buildNewSampleBlock();
     void buildNewSampleBlockMcp4922();

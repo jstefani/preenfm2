@@ -454,9 +454,13 @@ void Synth::afterNewParamsLoad(int timbre) {
 
 }
 
-void Synth::newDx7Patch(int timbre, uint8_t* packedPatch) {
-    dx7->setTimbrePatch(timbre, packedPatch);
+void Synth::newDx7Patch(int timbre, uint8_t* unpackedVoice) {
+    dx7->setTimbrePatchUnpacked(timbre, unpackedVoice);
     timbres[timbre].setDx7Mode(true);
+}
+
+void Synth::newDx7ParamValue(int timbre, int row, int encoder, int index, int value) {
+    dx7->setParam(timbre, index, (uint8_t)value);
 }
 
 void Synth::afterNewComboLoad() {

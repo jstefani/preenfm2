@@ -42,9 +42,10 @@ const char* const characterName[NUMBER_OF_CHARACTERS] = { "PRC", "KEY", "PAD", "
 const uint8_t carrierCoarse[] = { 1, 1, 1, 1, 1, 1, 2, 2, 0, 0, 3, 4 };
 const uint8_t modulatorCoarse[] = { 1, 1, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 0 };
 
-// Unpacked VCED (155 bytes) to packed (128 bytes). Inverse of the unpack in
-// Hexter / Dx7Engine.
-void pack(const uint8_t* u, uint8_t* p) {
+}
+
+// Unpacked VCED (155 bytes) to packed (128 bytes).
+void dx7PackPatch(const uint8_t* u, uint8_t* p) {
     for (int o = 0; o < 6; o++) {
         const uint8_t* s = u + o * 21;
         uint8_t* d = p + o * 17;
@@ -72,6 +73,43 @@ void pack(const uint8_t* u, uint8_t* p) {
     }
 }
 
+// Packed to unpacked VCED. Same routine as Hexter::patchUnpack.
+void dx7UnpackPatch(const uint8_t* packed_patch, uint8_t* unpacked_patch) {
+    const uint8_t *pp = packed_patch;
+    uint8_t *up = unpacked_patch;
+    int i, j;
+
+    for (i = 6; i > 0; i--) {
+        for (j = 11; j > 0; j--) {
+            *up++ = *pp++;
+        }                           /* through rd */
+        *up++     = (*pp) & 0x03;   /* lc */
+        *up++     = (*pp++) >> 2;   /* rc */
+        *up++     = (*pp) & 0x07;   /* rs */
+        *(up + 6) = (*pp++) >> 3;   /* pd */
+        *up++     = (*pp) & 0x03;   /* ams */
+        *up++     = (*pp++) >> 2;   /* kvs */
+        *up++     = *pp++;          /* ol */
+        *up++     = (*pp) & 0x01;   /* m */
+        *up++     = (*pp++) >> 1;   /* fc */
+        *up       = *pp++;          /* ff */
+        up += 2;
+    }                               /* operator done */
+    for (i = 9; i > 0; i--) {
+        *up++ = *pp++;
+    }                               /* through algorithm */
+    *up++ = (*pp) & 0x07;           /* feedback */
+    *up++ = (*pp++) >> 3;           /* oks */
+    for (i = 4; i > 0; i--) {
+        *up++ = *pp++;
+    }                               /* through lamd */
+    *up++ = (*pp) & 0x01;           /* lfo ks */
+    *up++ = ((*pp) >> 1) & 0x07;    /* lfo wave */
+    *up++ = (*pp++) >> 4;           /* lfo pms */
+    for (i = 11; i > 0; i--) {
+        *up++ = *pp++;
+    }                               /* transpose + name */
+    unpacked_patch[155] = 0;
 }
 
 static void generateTame(Rng& rng, int index, uint8_t* u) {
@@ -315,5 +353,5 @@ void dx7GenerateRandomPatch(int mode, uint32_t seed, int index, uint8_t* packed)
         break;
     }
 
-    pack(u, packed);
+    dx7PackPatch(u, packed);
 }

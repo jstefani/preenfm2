@@ -53,8 +53,15 @@ DX7 sysex patches can be played by a port of the msfa engine used by Dexed
   still address the files.
 * Up to 8 DX7 voices are shared by all timbres. Pitch bend, mod wheel
   (vibrato), hold pedal, the arpeggiator and the per-timbre filter/gain/pan
-  stage work. Editing the displayed (converted) parameters does not change
-  a DX7 timbre's sound yet; combos only store preenfm2 patches.
+  stage work.
+* Editing: on a DX7 timbre the edit screen shows DX7 rows. Synth button:
+  Algo / Feedback / OscSync / Voices. Osc button: cycles operators 1-6; Env
+  button: cycles the operator views Freq (mode, coarse, fine, detune), Level
+  (output level, velocity, AMS, rate scaling), Rates, Levels, KeyScale, Curves.
+  Matrix button: pitch EG rates / levels. LFO button: speed, delay, PMD, AMD /
+  sync, wave, PMS, transpose. Playing notes follow the edits. Saving an edited
+  DX7 voice back to a DX7 bank is not implemented yet (the preenfm2 Save menu
+  stores the converted patch); combos only store preenfm2 patches.
 
 ## New Filters in 2.11
 

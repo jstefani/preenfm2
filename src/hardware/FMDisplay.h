@@ -105,6 +105,11 @@ public:
     void newParamValueFromExternal(int timbre, int currentRow, int encoder, ParameterDisplay* param, float oldValue, float newValue);
     void newParamValue(int timbre, int currentRow, int encoder, ParameterDisplay* param, float oldValue, float newValue);
     void newcurrentRow(int timbre, int newcurrentRow);
+    // DX7 engine edit rows
+    void newDx7ParamValue(int timbre, int row, int encoder, int index, int value);
+    void dx7UpdateEncoderName(int row, int encoder);
+    void dx7UpdateEncoderValue(int row, int encoder);
+    void dx7DisplayRowName(int row);
     void updateStepSequencer(int currentRow, int encoder, int oldValue, int newValue);
     void updateArpPattern(int currentRow, int encoder, int oldValue, int newValue);
     void newPresetName(int timbre);

@@ -37,6 +37,7 @@ struct Dx7Voice {
     msfa::Dx7Note note;
     int8_t timbre;          // -1 = free
     uint8_t midiNote;
+    uint8_t velocity;
     bool released;
     bool heldByPedal;
     uint32_t index;         // allocation order, lowest = oldest
@@ -57,6 +58,9 @@ public:
 
     // Patch management (called from the main loop, never from the audio IRQ)
     void setTimbrePatch(int timbre, const uint8_t* packedPatch);
+    void setTimbrePatchUnpacked(int timbre, const uint8_t* unpackedVoice);
+    // Live edit of one byte of the timbre's voice; playing notes follow
+    void setParam(int timbre, int index, uint8_t value);
     void deactivateTimbre(int timbre);
     bool isTimbreActive(int timbre) { return timbres[timbre].active; }
 
@@ -81,7 +85,7 @@ public:
     int render(int timbre, float* stereoBlock);
 
 private:
-    static void unpack(const uint8_t* packed, uint8_t* unpacked);
+    int transposedNote(int timbre, int midiNote);
     int allocateVoice(int timbre, int maxVoices);
     void freeVoice(int v);
 

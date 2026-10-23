@@ -23,6 +23,12 @@ enum Dx7RandomMode {
 
 extern const char* const dx7RandomBankName[DX7_RANDOM_MODES];
 
+// DX7 voice formats : packed (128 bytes, as in a 32 voice sysex bank) and
+// unpacked VCED (155 bytes, the layout the engine and the editor use;
+// buffers are 156 bytes, the last one is unused).
+void dx7PackPatch(const uint8_t* unpacked, uint8_t* packed);
+void dx7UnpackPatch(const uint8_t* packed, uint8_t* unpacked);
+
 // Generates patch 'index' (0..31) of the virtual random bank 'mode' identified
 // by 'seed' into a 128 byte packed DX7 voice, the format of a 32 voice sysex
 // bank. Deterministic : the same seed and index always give the same patch,

@@ -65,8 +65,10 @@ public:
     virtual void stopNote(int timbre, char note) = 0;
 
     virtual void newPresetName(int timbre) {};
-    // A DX7 sysex patch was loaded into timbre : run it on the DX7 engine
-    virtual void newDx7Patch(int timbre, uint8_t* packedPatch) {};
+    // A DX7 voice (unpacked, 155 bytes) was loaded into timbre : run it on the DX7 engine
+    virtual void newDx7Patch(int timbre, uint8_t* unpackedVoice) {};
+    // One byte of the DX7 voice of timbre was edited (row/encoder : DX7 edit row)
+    virtual void newDx7ParamValue(int timbre, int row, int encoder, int index, int value) {};
 
     SynthParamListener* nextListener;
 };

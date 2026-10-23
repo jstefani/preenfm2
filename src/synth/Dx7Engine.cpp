@@ -14,6 +14,7 @@
 #include "msfa_env.h"
 #include "msfa_freqlut.h"
 #include "msfa_pitchenv.h"
+#include "DX7Random.h"
 
 Dx7Engine dx7Engine;
 
@@ -51,54 +52,51 @@ void Dx7Engine::init(float sampleRate) {
     outputScale = 1.0f / 134217728.0f;
 }
 
-// DX7 packed (128 bytes, as in a 32 voice sysex bank) to unpacked (155 bytes)
-// Same routine as Hexter::patchUnpack.
-void Dx7Engine::unpack(const uint8_t *packed_patch, uint8_t *unpacked_patch) {
-    const uint8_t *pp = packed_patch;
-    uint8_t *up = unpacked_patch;
-    int i, j;
-
-    for (i = 6; i > 0; i--) {
-        for (j = 11; j > 0; j--) {
-            *up++ = *pp++;
-        }                           /* through rd */
-        *up++     = (*pp) & 0x03;   /* lc */
-        *up++     = (*pp++) >> 2;   /* rc */
-        *up++     = (*pp) & 0x07;   /* rs */
-        *(up + 6) = (*pp++) >> 3;   /* pd */
-        *up++     = (*pp) & 0x03;   /* ams */
-        *up++     = (*pp++) >> 2;   /* kvs */
-        *up++     = *pp++;          /* ol */
-        *up++     = (*pp) & 0x01;   /* m */
-        *up++     = (*pp++) >> 1;   /* fc */
-        *up       = *pp++;          /* ff */
-        up += 2;
-    }                               /* operator done */
-    for (i = 9; i > 0; i--) {
-        *up++ = *pp++;
-    }                               /* through algorithm */
-    *up++ = (*pp) & 0x07;           /* feedback */
-    *up++ = (*pp++) >> 3;           /* oks */
-    for (i = 4; i > 0; i--) {
-        *up++ = *pp++;
-    }                               /* through lamd */
-    *up++ = (*pp) & 0x01;           /* lfo ks */
-    *up++ = ((*pp) >> 1) & 0x07;    /* lfo wave */
-    *up++ = (*pp++) >> 4;           /* lfo pms */
-    for (i = 11; i > 0; i--) {
-        *up++ = *pp++;
-    }                               /* transpose + name */
-    unpacked_patch[155] = 0;
+void Dx7Engine::setTimbrePatch(int timbre, const uint8_t* packedPatch) {
+    uint8_t unpacked[DX7_UNPACKED_PATCH_SIZE];
+    dx7UnpackPatch(packedPatch, unpacked);
+    setTimbrePatchUnpacked(timbre, unpacked);
 }
 
-void Dx7Engine::setTimbrePatch(int timbre, const uint8_t* packedPatch) {
+void Dx7Engine::setTimbrePatchUnpacked(int timbre, const uint8_t* unpackedVoice) {
     allSoundOff(timbre);
     Dx7TimbreState& ts = timbres[timbre];
-    unpack(packedPatch, ts.patch);
+    for (int k = 0; k < DX7_UNPACKED_PATCH_SIZE; k++) {
+        ts.patch[k] = unpackedVoice[k];
+    }
     // LFO parameters start at 137 : speed, delay, pmd, amd, sync, wave
     ts.lfo.reset(&ts.patch[137]);
     ts.controllers.refresh();
     ts.active = true;
+}
+
+void Dx7Engine::setParam(int timbre, int index, uint8_t value) {
+    if (index < 0 || index >= DX7_UNPACKED_PATCH_SIZE) {
+        return;
+    }
+    Dx7TimbreState& ts = timbres[timbre];
+    ts.patch[index] = value;
+    if (index >= 137 && index <= 143) {
+        ts.lfo.reset(&ts.patch[137]);
+    }
+    // Playing notes follow the edit, as on Dexed
+    for (int v = 0; v < DX7_MAX_VOICES; v++) {
+        Dx7Voice& voice = voices[v];
+        if (voice.timbre == timbre && voice.fadeBlocks < 0) {
+            voice.note.update(ts.patch, transposedNote(timbre, voice.midiNote), voice.velocity);
+        }
+    }
+}
+
+int Dx7Engine::transposedNote(int timbre, int midiNote) {
+    // VCED 144 : transpose, 24 = C3 = none
+    int note = midiNote + (int)timbres[timbre].patch[144] - 24;
+    if (note < 0) {
+        note = 0;
+    } else if (note > 127) {
+        note = 127;
+    }
+    return note;
 }
 
 void Dx7Engine::deactivateTimbre(int timbre) {
@@ -177,12 +175,13 @@ void Dx7Engine::noteOn(int timbre, uint8_t note, uint8_t velocity, int maxVoices
     // voice is initialised first and made visible last. A stolen voice is
     // re-initialised in place, like the preenfm2 engine does.
     voice.midiNote = note;
+    voice.velocity = velocity;
     voice.released = false;
     voice.heldByPedal = false;
     voice.fadeBlocks = -1;
     voice.index = voiceIndex++;
     ts.lfo.keydown();
-    voice.note.init(ts.patch, note, velocity);
+    voice.note.init(ts.patch, transposedNote(timbre, note), velocity);
     voice.timbre = timbre;
 }
 

@@ -365,6 +365,12 @@ enum EventState {
 
 class Hexter;
 
+// Engine running a timbre
+enum TimbreEngine {
+    ENGINE_PREENFM = 0,
+    ENGINE_DX7
+};
+
 class SynthState : public EncodersListener {
 public:
     SynthState();
@@ -547,11 +553,18 @@ public:
     void propagateAfterNewParamsLoad(int timbre);
     void propagateAfterNewComboLoad();
     void propagateNewTimbre(int timbre);
-    // DX7 engine : the packed sysex patch is handed to the synth after the
+    // DX7 engine : the unpacked voice is handed to the synth after the
     // converted params have been loaded, so the timbre runs the DX7 engine.
-    void propagateNewDx7Patch(int timbre, uint8_t* packedPatch);
+    void propagateNewDx7Patch(int timbre, const uint8_t* unpackedVoice);
+    void propagateNewDx7ParamValue(int row, int encoder, int index, int value);
     void backupTimbreEngine(int timbre);
     void restoreTimbreEngine(int timbre);
+    bool isTimbreDx7(int timbre) { return timbreEngine[timbre] == ENGINE_DX7; }
+    // The current timbre runs the DX7 engine : the edit screen shows DX7 rows
+    bool isDx7Edit() { return timbreEngine[currentTimbre] == ENGINE_DX7; }
+    int getDx7Row() { return dx7Row; }
+    // Value of a DX7 edit row encoder for the current timbre (raw, 0..max)
+    int getDx7Value(int row, int encoder);
 
     SynthEditMode getSynthMode() {
         return fullState.synthMode;
@@ -607,6 +620,9 @@ private:
     int getRowFromOperator();
     bool isCurrentRowAvailable() const;
     bool isEnterNameState(int currentItme);
+    void dx7EncoderTurned(int encoder, int ticks);
+    void changeDx7Row(int button, int step);
+    char dx7Row, dx7Operator, dx7View;
     char engineRow, oscillatorRow, envelopeRow, matrixRow, lfoRow;
     char operatorNumber, operatorView;
     char currentRow;

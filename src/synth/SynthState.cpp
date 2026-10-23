@@ -18,6 +18,8 @@
 #include "stm32f4xx_rng.h"
 #include "SynthState.h"
 #include "Hexter.h"
+#include "Dx7Params.h"
+#include "DX7Random.h"
 
 #include "LiquidCrystal.h"
 extern LiquidCrystal      lcd;
@@ -27,12 +29,11 @@ extern Synth synth;
 
 #define NULL 0
 
-// DX7 engine : packed sysex patch per timbre + backup for the menu "undo".
+// DX7 engine : unpacked voice (VCED) per timbre + backup for the menu "undo".
 // File scope so they live in main RAM : SynthState itself is in CCM.
-#define ENGINE_PREENFM 0
-#define ENGINE_DX7 1
-static uint8_t dx7PackedPatches[NUMBER_OF_TIMBRES][128];
-static uint8_t backupDx7PackedPatch[128];
+#define DX7_VOICE_SIZE 156
+static uint8_t dx7Voices[NUMBER_OF_TIMBRES][DX7_VOICE_SIZE];
+static uint8_t backupDx7Voice[DX7_VOICE_SIZE];
 // FLASH :  __attribute__ ((section (".USER_FLASH")))
 // Ex : const char* nullNames [] __attribute__ ((section (".USER_FLASH")))= {};
 // DISPLAY structures
@@ -717,6 +718,9 @@ SynthState::SynthState() {
         timbreEngine[t] = ENGINE_PREENFM;
     }
     backupEngine = ENGINE_PREENFM;
+    dx7Row = DX7_ROW_ENGINE;
+    dx7Operator = 0;
+    dx7View = 0;
     engineRow =  0;
     // operator works for both osc and env
     oscillatorRow  = 0;
@@ -886,6 +890,10 @@ void SynthState::encoderTurnedForArpPattern(int row, int encoder, int ticks) {
 }
 
 void SynthState::twoButtonsPressed(int button1, int button2) {
+    if (unlikely(isDx7Edit() && fullState.synthMode == SYNTH_MODE_EDIT && button1 != BUTTON_BACK)) {
+        // Operator copy and friends are preenfm2 features
+        return;
+    }
     int oldCurrentRow = currentRow;
 
     switch (button1) {
@@ -1027,6 +1035,15 @@ void SynthState::encoderTurnedWhileButtonPressed(int encoder, int ticks, int but
 
     // SYNTH_MODE_EDIT
 
+    if (unlikely(isDx7Edit())) {
+        int oldDx7Row = dx7Row;
+        changeDx7Row(button, ticks > 0 ? 1 : -1);
+        if (oldDx7Row != dx7Row) {
+            propagateNewCurrentRow(dx7Row);
+        }
+        return;
+    }
+
     int oldCurrentRow = currentRow;
     switch (button) {
     case BUTTON_SYNTH:
@@ -1157,6 +1174,11 @@ bool SynthState::newRandomizerValue(int encoder, int ticks) {
 
 void SynthState::encoderTurned(int encoder, int ticks) {
     if (fullState.synthMode == SYNTH_MODE_EDIT) {
+
+        if (unlikely(isDx7Edit())) {
+            dx7EncoderTurned(encoder, ticks);
+            return;
+        }
 
         // Step sequencer special case
         if (unlikely(currentRow == ROW_LFOSEQ1 || currentRow == ROW_LFOSEQ2)) {
@@ -1485,7 +1507,9 @@ void SynthState::loadDx7Patch(int timbre, PFM2File const *bank, int patchNumber,
     propagateAfterNewParamsLoad(timbre);
     if (packedPatch != 0 && fullState.midiConfigValue[MIDICONFIG_DX7_ENGINE] == 0) {
         // Native : play the real DX7 data on the DX7 engine
-        propagateNewDx7Patch(timbre, packedPatch);
+        uint8_t unpacked[DX7_VOICE_SIZE];
+        dx7UnpackPatch(packedPatch, unpacked);
+        propagateNewDx7Patch(timbre, unpacked);
     }
     restoreTestNote();
 }
@@ -1729,6 +1753,9 @@ void SynthState::setCurrentInstrument(int value) {
     if ( !isCurrentRowAvailable() && currentRow >= ROW_ENGINE_FIRST && currentRow <= ROW_ENGINE_LAST) {
         changeSynthModeRow( BUTTON_SYNTH, -1 );
     }
+    // The display compares edited rows against the displayed one : keep it in
+    // sync when the engine of the new timbre differs
+    propagateNewCurrentRow(isDx7Edit() ? dx7Row : currentRow);
 }
 
 void SynthState::buttonPressed(int button) {
@@ -1743,11 +1770,21 @@ void SynthState::buttonPressed(int button) {
         case BUTTON_ENV:
         case BUTTON_MATRIX:
         case BUTTON_LFO:
-            changeSynthModeRow(button , 1);
-            onUserChangedRow();
+            if (unlikely(isDx7Edit())) {
+                int oldDx7Row = dx7Row;
+                changeDx7Row(button, 1);
+                if (oldDx7Row != dx7Row) {
+                    propagateNewCurrentRow(dx7Row);
+                }
+            } else {
+                changeSynthModeRow(button , 1);
+                onUserChangedRow();
+            }
             break;
         case BUTTON_ENCODER:
-            currentRow = ROW_PERFORMANCE1;
+            if (!isDx7Edit()) {
+                currentRow = ROW_PERFORMANCE1;
+            }
             break;
         case BUTTON_MENUSELECT:
             fullState.synthMode = SYNTH_MODE_MENU;
@@ -2332,26 +2369,127 @@ void SynthState::propagateNewTimbre(int timbre) {
     }
 }
 
-void SynthState::propagateNewDx7Patch(int timbre, uint8_t* packedPatch) {
-    for (int k = 0; k < 128; k++) {
-        dx7PackedPatches[timbre][k] = packedPatch[k];
+void SynthState::propagateNewDx7Patch(int timbre, const uint8_t* unpackedVoice) {
+    if (unpackedVoice != dx7Voices[timbre]) {
+        for (int k = 0; k < DX7_VOICE_SIZE; k++) {
+            dx7Voices[timbre][k] = unpackedVoice[k];
+        }
     }
     timbreEngine[timbre] = ENGINE_DX7;
     for (SynthParamListener* listener = firstParamListener; listener !=0; listener = listener->nextListener) {
-        listener->newDx7Patch(timbre, dx7PackedPatches[timbre]);
+        listener->newDx7Patch(timbre, dx7Voices[timbre]);
+    }
+}
+
+void SynthState::propagateNewDx7ParamValue(int row, int encoder, int index, int value) {
+    for (SynthParamListener* listener = firstParamListener; listener !=0; listener = listener->nextListener) {
+        listener->newDx7ParamValue(currentTimbre, row, encoder, index, value);
     }
 }
 
 void SynthState::backupTimbreEngine(int timbre) {
     backupEngine = timbreEngine[timbre];
-    for (int k = 0; k < 128; k++) {
-        backupDx7PackedPatch[k] = dx7PackedPatches[timbre][k];
+    for (int k = 0; k < DX7_VOICE_SIZE; k++) {
+        backupDx7Voice[k] = dx7Voices[timbre][k];
     }
 }
 
 void SynthState::restoreTimbreEngine(int timbre) {
     if (backupEngine == ENGINE_DX7) {
-        propagateNewDx7Patch(timbre, backupDx7PackedPatch);
+        propagateNewDx7Patch(timbre, backupDx7Voice);
+    }
+}
+
+int SynthState::getDx7Value(int row, int encoder) {
+    int index = dx7EncoderIndex(row, encoder);
+    if (index == DX7_INDEX_VOICES) {
+        return (int)params->engine1.numberOfVoice;
+    }
+    if (index < 0) {
+        return 0;
+    }
+    return dx7Voices[currentTimbre][index];
+}
+
+void SynthState::dx7EncoderTurned(int encoder, int ticks) {
+    const Dx7RowDef* def = dx7RowDef(dx7Row);
+    const Dx7EncoderDef& enc = def->encoders[encoder];
+    int index = dx7EncoderIndex(dx7Row, encoder);
+    if (index == DX7_INDEX_NONE) {
+        return;
+    }
+    if (index == DX7_INDEX_VOICES) {
+        // preenfm2 voice count : same checks and listeners as the native Engine row
+        struct ParameterDisplay* param = &(allParameterRows.row[ROW_ENGINE]->params[ENCODER_ENGINE_VOICE]);
+        float oldValue = params->engine1.numberOfVoice;
+        float newValue = oldValue + (ticks > 0 ? 1.0f : -1.0f);
+        for (SynthParamChecker* checker = firstParamChecker; checker != 0; checker = checker->nextChecker) {
+            checker->checkNewParamValue(currentTimbre, ROW_ENGINE, ENCODER_ENGINE_VOICE, oldValue, &newValue);
+        }
+        if (newValue > param->maxValue) {
+            newValue = param->maxValue;
+        }
+        if (newValue < param->minValue) {
+            newValue = param->minValue;
+        }
+        if (newValue != oldValue) {
+            params->engine1.numberOfVoice = newValue;
+            propagateNewParamValue(currentTimbre, ROW_ENGINE, ENCODER_ENGINE_VOICE, param, oldValue, newValue);
+        }
+        return;
+    }
+    uint8_t* voice = dx7Voices[currentTimbre];
+    int oldValue = voice[index];
+    // No encoder acceleration on named values
+    int step = (enc.valueNames != 0) ? (ticks > 0 ? 1 : -1) : ticks;
+    int newValue = oldValue + step;
+    if (newValue > enc.maxValue) {
+        newValue = enc.maxValue;
+    }
+    if (newValue < 0) {
+        newValue = 0;
+    }
+    if (newValue != oldValue) {
+        voice[index] = newValue;
+        propagateNewDx7ParamValue(dx7Row, encoder, index, newValue);
+    }
+}
+
+void SynthState::changeDx7Row(int button, int step) {
+    switch (button) {
+    case BUTTON_SYNTH:
+        dx7Row = DX7_ROW_ENGINE;
+        break;
+    case BUTTON_MATRIX:
+        dx7Row = (dx7Row == DX7_ROW_PEG_RATES) ? DX7_ROW_PEG_LEVELS : DX7_ROW_PEG_RATES;
+        break;
+    case BUTTON_LFO:
+        dx7Row = (dx7Row == DX7_ROW_LFO1) ? DX7_ROW_LFO2 : DX7_ROW_LFO1;
+        break;
+    case BUTTON_OSC:
+        // Operator select ; the first press from a global row keeps the operator
+        if (dx7RowIsOperator(dx7Row)) {
+            dx7Operator += step;
+            if (dx7Operator > 5) {
+                dx7Operator = 0;
+            } else if (dx7Operator < 0) {
+                dx7Operator = 5;
+            }
+        }
+        dx7Row = dx7OperatorRow(dx7Operator, dx7View);
+        break;
+    case BUTTON_ENV:
+        // View select : Freq, Level, Rates, Levels, KeyScale, Curves
+        if (dx7RowIsOperator(dx7Row)) {
+            dx7View += step;
+            if (dx7View >= DX7_OPERATOR_VIEWS) {
+                dx7View = 0;
+            } else if (dx7View < 0) {
+                dx7View = DX7_OPERATOR_VIEWS - 1;
+            }
+        }
+        dx7Row = dx7OperatorRow(dx7Operator, dx7View);
+        break;
     }
 }
 
