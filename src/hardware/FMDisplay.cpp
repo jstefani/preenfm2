@@ -929,6 +929,7 @@ int FMDisplay::rowInc(MenuState menuState) {
     case MENU_RENAME_BANK:
     case MENU_RENAME_COMBO:
     case MENU_SAVE_ENTER_PRESET_NAME:
+    case MENU_SAVE_ENTER_DX7_NAME:
         return 0;
     }
     return 1;
@@ -954,6 +955,13 @@ void FMDisplay::newMenuState(FullState* fullState) {
             lcd->print(allChars[(int)fullState->name[k]]);
         }
         break;
+    case MENU_SAVE_ENTER_DX7_NAME:
+        lcd->setCursor(6, menuRow);
+        for (int k=0;k<10; k++) {
+            lcd->print(allChars[(int)fullState->name[k]]);
+        }
+        lcd->print("  ");
+        break;
     case MENU_SAVE_ENTER_PRESET_NAME:
         lcd->setCursor(6, menuRow);
         for (int k=0;k<12; k++) {
@@ -962,6 +970,7 @@ void FMDisplay::newMenuState(FullState* fullState) {
         break;
     case MENU_CREATE_COMBO:
     case MENU_CREATE_BANK:
+    case MENU_CREATE_DX7_BANK:
     case MENU_RENAME_COMBO:
     case MENU_RENAME_BANK:
         lcd->setCursor(6, menuRow);
@@ -1069,6 +1078,14 @@ void FMDisplay::newMenuSelect(FullState* fullState) {
     case MENU_LOAD_SELECT_DX7_BANK:
         displayBankSelect(fullState->menuSelect, (fullState->dx7Bank->fileType != FILE_EMPTY), fullState->dx7Bank->name);
         break;
+    case MENU_SAVE_SELECT_DX7_BANK:
+        displayBankSelect(fullState->menuSelect,
+            (fullState->dx7Bank->fileType == FILE_OK && storage->getDX7SysexFile()->randomBankIndex(fullState->dx7Bank) < 0),
+            fullState->dx7Bank->name);
+        break;
+    case MENU_SAVE_SELECT_DX7_PRESET:
+        displayPatchSelect(fullState->menuSelect, storage->getDX7SysexFile()->dx7LoadPatchName(fullState->dx7Bank, fullState->menuSelect));
+        break;
     case MENU_SAVE_SELECT_BANK:
         displayBankSelect(fullState->menuSelect, (fullState->preenFMBank->fileType == FILE_OK), fullState->preenFMBank->name);
         break;
@@ -1134,6 +1151,8 @@ void FMDisplay::newMenuSelect(FullState* fullState) {
         break;
     case MENU_CREATE_BANK:
     case MENU_CREATE_COMBO:
+    case MENU_CREATE_DX7_BANK:
+    case MENU_SAVE_ENTER_DX7_NAME:
         lcd->setCursor(6+fullState->menuSelect, menuRow);
         lcd->print(allChars[(int)fullState->name[fullState->menuSelect]]);
         lcd->setCursor(6+fullState->menuSelect, menuRow);

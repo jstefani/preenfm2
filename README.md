@@ -59,9 +59,12 @@ DX7 sysex patches can be played by a port of the msfa engine used by Dexed
   button: cycles the operator views Freq (mode, coarse, fine, detune), Level
   (output level, velocity, AMS, rate scaling), Rates, Levels, KeyScale, Curves.
   Matrix button: pitch EG rates / levels. LFO button: speed, delay, PMD, AMD /
-  sync, wave, PMS, transpose. Playing notes follow the edits. Saving an edited
-  DX7 voice back to a DX7 bank is not implemented yet (the preenfm2 Save menu
-  stores the converted patch); combos only store preenfm2 patches.
+  sync, wave, PMS, transpose. Playing notes follow the edits.
+* Saving: Save > DX7 writes the timbre's DX7 voice into a slot of a `.syx`
+  bank on the key (standard 32 voice format, checksum updated, readable by
+  Dexed and a real DX7), after a 10 character name. Tools > Crea > DX7 creates
+  a new bank of INIT VOICEs. Save > Bnk still stores the converted preenfm2
+  patch. Combos only store preenfm2 patches.
 
 ## New Filters in 2.11
 

@@ -294,22 +294,43 @@ const struct MenuItem allMenus[]  = {
                 MENU_SAVE,
                 "Save",
                 true,
-                4,
-                {MENU_SAVE_SELECT_BANK, MENU_SAVE_SELECT_COMBO, MENU_DEFAULT_COMBO, MENU_SAVE_SYSEX_PATCH }
+                5,
+                {MENU_SAVE_SELECT_BANK, MENU_SAVE_SELECT_COMBO, MENU_DEFAULT_COMBO, MENU_SAVE_SYSEX_PATCH, MENU_SAVE_SELECT_DX7_BANK }
         },
         {
                 MENU_SAVE_SELECT_BANK,
-                "Bank",
+                "Bnk",
                 false,
                 NUMBEROFPREENFMBANKS,
                 {MENU_SAVE_SELECT_BANK_PRESET}
         },
         {
                 MENU_SAVE_SELECT_COMBO,
-                "Combo",
+                "Cmb",
                 false,
                 NUMBEROFPREENFMCOMBOS,
                 {MENU_SAVE_SELECT_COMBO_PRESET}
+        },
+        {
+                MENU_SAVE_SELECT_DX7_BANK,
+                "DX7",
+                false,
+                NUMBEROFDX7BANKS,
+                {MENU_SAVE_SELECT_DX7_PRESET}
+        },
+        {
+                MENU_SAVE_SELECT_DX7_PRESET,
+                "",
+                false,
+                32,
+                {MENU_SAVE_ENTER_DX7_NAME}
+        },
+        {
+                MENU_SAVE_ENTER_DX7_NAME,
+                "Enter name",
+                false,
+                10,
+                {MENU_DONE}
         },
         {
                 MENU_SAVE_SELECT_BANK_PRESET,
@@ -327,7 +348,7 @@ const struct MenuItem allMenus[]  = {
         },
         {
                 MENU_DEFAULT_COMBO,
-                "Defl",
+                "Dfl",
                 true,
                 2,
                 {MENU_DEFAULT_COMBO_SAVE, MENU_DEFAULT_COMBO_RESET}
@@ -426,8 +447,15 @@ const struct MenuItem allMenus[]  = {
                 MENU_CREATE,
                 "Crea",
                 true,
-                2,
-                { MENU_CREATE_BANK, MENU_CREATE_COMBO }
+                3,
+                { MENU_CREATE_BANK, MENU_CREATE_COMBO, MENU_CREATE_DX7_BANK }
+        },
+        {
+                MENU_CREATE_DX7_BANK,
+                "DX7",
+                false,
+                8,
+                {MENU_DONE}
         },
         {
                 MENU_CREATE_BANK,

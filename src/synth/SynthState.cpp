@@ -1391,6 +1391,7 @@ void SynthState::encoderTurned(int encoder, int ticks) {
         if (fullState.menuSelect != oldMenuSelect) {
             switch (fullState.currentMenuItem->menuState) {
             case MENU_LOAD_SELECT_DX7_BANK:
+            case MENU_SAVE_SELECT_DX7_BANK:
                 // Did we really change DX7 bank?
                 if (fullState.dx7Bank != storage->getDX7SysexFile()->getFile(fullState.menuSelect)) {
                     fullState.dx7Bank = storage->getDX7SysexFile()->getFile(fullState.menuSelect);
@@ -1399,6 +1400,9 @@ void SynthState::encoderTurned(int encoder, int ticks) {
                 break;
             case MENU_LOAD_SELECT_DX7_PRESET:
                 loadDx7Patch(currentTimbre, fullState.dx7Bank, fullState.menuSelect, params);
+                fullState.dx7PresetNumber = fullState.menuSelect;
+                break;
+            case MENU_SAVE_SELECT_DX7_PRESET:
                 fullState.dx7PresetNumber = fullState.menuSelect;
                 break;
             case MENU_LOAD_SELECT_BANK:
@@ -1731,7 +1735,9 @@ bool SynthState::isEnterNameState(int currentItem) {
             || currentItem == MENU_RENAME_BANK
             || currentItem == MENU_RENAME_COMBO
             || currentItem == MENU_CREATE_BANK
-            || currentItem == MENU_CREATE_COMBO;
+            || currentItem == MENU_CREATE_COMBO
+            || currentItem == MENU_CREATE_DX7_BANK
+            || currentItem == MENU_SAVE_ENTER_DX7_NAME;
 }
 
 
@@ -1901,6 +1907,11 @@ const MenuItem* SynthState::afterButtonPressed() {
         rMenuItem = MenuItemUtil::getMenuItem(fullState.currentMenuItem->subMenu[0]);
     }
 
+    if (rMenuItem->menuState == MENU_SAVE_SELECT_DX7_BANK && !isDx7Edit()) {
+        // Only a timbre running the DX7 engine has a DX7 voice to save
+        rMenuItem = MenuItemUtil::getMenuItem(MENU_ERROR);
+    }
+
     // ------------------------
     // Previous state switch
 
@@ -1947,6 +1958,47 @@ const MenuItem* SynthState::afterButtonPressed() {
         }
         fullState.dx7BankNumber = fullState.menuSelect;
         break;
+    case MENU_SAVE_SELECT_DX7_BANK:
+        if (fullState.dx7Bank->fileType != FILE_OK || storage->getDX7SysexFile()->randomBankIndex(fullState.dx7Bank) >= 0) {
+            return fullState.currentMenuItem;
+        }
+        fullState.dx7BankNumber = fullState.menuSelect;
+        break;
+    case MENU_SAVE_SELECT_DX7_PRESET:
+    {
+        // The name editor starts with the voice's own 10 character name
+        const uint8_t* voiceName = &dx7Voices[currentTimbre][145];
+        for (int k=0; k<12; k++) {
+            fullState.name[k] = 0;
+        }
+        for (int k=0; k<10; k++) {
+            for (int j=0; j<getLength(allChars); j++) {
+                if (voiceName[k] == allChars[j]) {
+                    fullState.name[k] = j;
+                }
+            }
+        }
+        break;
+    }
+    case MENU_SAVE_ENTER_DX7_NAME:
+    {
+        uint8_t* voice = dx7Voices[currentTimbre];
+        for (int k=0; k<10; k++) {
+            voice[145 + k] = (fullState.name[k] == 0) ? ' ' : allChars[(int)fullState.name[k]];
+        }
+        // The edit screen shows the converted preset's name : follow
+        int nameLength = 10;
+        while (nameLength > 0 && voice[145 + nameLength - 1] == ' ') {
+            nameLength--;
+        }
+        for (int k=0; k<nameLength; k++) {
+            params->presetName[k] = voice[145 + k];
+        }
+        params->presetName[nameLength] = '\0';
+        propagateNewPresetName(currentTimbre);
+        storage->getDX7SysexFile()->dx7SavePatch(fullState.dx7Bank, fullState.dx7PresetNumber, voice);
+        break;
+    }
     case MENU_LOAD_SELECT_COMBO_PRESET:
         loadPreenFMCombo(fullState.preenFMCombo, fullState.menuSelect);
         copySynthParams((char*)params, (char*)&backupParams);
@@ -2093,6 +2145,28 @@ const MenuItem* SynthState::afterButtonPressed() {
             rMenuItem = MenuItemUtil::getMenuItem(MENU_ERROR);
         }
         break;
+    case MENU_CREATE_DX7_BANK:
+        for (length=8; fullState.name[length-1] == 0; length--);
+        for (int k=0; k<length; k++) {
+            fullState.name[k] = allChars[(int)fullState.name[k]];
+        }
+        fullState.name[length++] = '.';
+        fullState.name[length++] = 's';
+        fullState.name[length++] = 'y';
+        fullState.name[length++] = 'x';
+        fullState.name[length] = '\0';
+        if (!storage->getDX7SysexFile()->nameExists(fullState.name)) {
+            cmi = fullState.currentMenuItem;
+            lcd.setRealTimeAction(true);
+            fullState.currentMenuItem = MenuItemUtil::getMenuItem(MENU_IN_PROGRESS);
+            propagateNewMenuState();
+            storage->getDX7SysexFile()->create(fullState.name);
+            lcd.setRealTimeAction(false);
+            fullState.currentMenuItem = cmi;
+        } else {
+            rMenuItem = MenuItemUtil::getMenuItem(MENU_ERROR);
+        }
+        break;
     case MENU_CONFIG_SETTINGS_SAVE:
         storage->getConfigurationFile()->saveConfig(fullState.midiConfigValue);
         break;
@@ -2138,6 +2212,23 @@ const MenuItem* SynthState::afterButtonPressed() {
     case MENU_CREATE_COMBO:
     {
         const char *bankName = "COMBO01";
+        int length = 7;
+        for (int k=0; k<length ; k++) {
+            for (int j=0; j<getLength(allChars); j++) {
+                if (bankName[k] == allChars[j]) {
+                    fullState.name[k] = j;
+                }
+            }
+        }
+        for (int k=length; k<8; k++) {
+            fullState.name[k] = 0;
+        }
+        fullState.menuSelect = 0;
+        break;
+    }
+    case MENU_CREATE_DX7_BANK:
+    {
+        const char *bankName = "DX7BK01";
         int length = 7;
         for (int k=0; k<length ; k++) {
             for (int j=0; j<getLength(allChars); j++) {
@@ -2211,6 +2302,9 @@ const MenuItem* SynthState::afterButtonPressed() {
     case MENU_SAVE_SELECT_BANK_PRESET:
         fullState.menuSelect = fullState.preenFMPresetNumber;
         break;
+    case MENU_SAVE_SELECT_DX7_PRESET:
+        fullState.menuSelect = fullState.dx7PresetNumber;
+        break;
     case MENU_SAVE_SELECT_COMBO_PRESET:
         fullState.menuSelect = fullState.preenFMComboPresetNumber;
         break;
@@ -2250,6 +2344,7 @@ const MenuItem* SynthState::afterButtonPressed() {
         fullState.preenFMCombo = storage->getComboBank()->getFile(fullState.menuSelect);
         break;
     case MENU_LOAD_SELECT_DX7_BANK:
+    case MENU_SAVE_SELECT_DX7_BANK:
         fullState.menuSelect = fullState.dx7BankNumber;
         fullState.dx7Bank = storage->getDX7SysexFile()->getFile(fullState.menuSelect);
         break;
@@ -2293,6 +2388,12 @@ const MenuItem* SynthState::menuBack() {
         break;
     case MENU_SAVE_ENTER_COMBO_NAME:
         fullState.menuSelect = fullState.preenFMComboNumber;
+        break;
+    case MENU_SAVE_ENTER_DX7_NAME:
+        fullState.menuSelect = fullState.dx7PresetNumber;
+        break;
+    case MENU_SAVE_SELECT_DX7_PRESET:
+        fullState.menuSelect = fullState.dx7BankNumber;
         break;
     case MENU_RENAME_BANK:
     case MENU_SAVE_SELECT_BANK_PRESET:

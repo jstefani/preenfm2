@@ -114,6 +114,10 @@ enum MenuState {
     MENU_SCALA_FILENAME,
     MENU_SCALA_FREQUENCY,
     MENU_SCALA_MAPPING,
+    MENU_SAVE_SELECT_DX7_BANK,
+    MENU_SAVE_SELECT_DX7_PRESET,
+    MENU_SAVE_ENTER_DX7_NAME,
+    MENU_CREATE_DX7_BANK,
     LAST_MENU
 } ;
 
@@ -124,7 +128,7 @@ struct MenuItem {
     const char* name;
     bool hasSubMenu;
     short maxValue;
-    MenuState subMenu[4];
+    MenuState subMenu[5];
 };
 
 struct Randomizer {
@@ -203,7 +207,7 @@ public:
         const MenuItem* item = &allMenus[0];
         int cpt = 0;
         while (item->menuState != LAST_MENU) {
-            for (int k=0; k<4; k++) {
+            for (int k=0; k<5; k++) {
                 if (item->subMenu[k] == ms) {
                     return item;
                 }
@@ -218,7 +222,7 @@ public:
         const MenuItem* item = &allMenus[0];
         int cpt = 0;
         while (item->menuState != LAST_MENU) {
-            for (int k=0; k<4; k++) {
+            for (int k=0; k<5; k++) {
                 if (item->subMenu[k] == ms) {
                     return k;
                 }

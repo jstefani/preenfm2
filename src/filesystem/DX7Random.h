@@ -27,6 +27,8 @@ extern const char* const dx7RandomBankName[DX7_RANDOM_MODES];
 // unpacked VCED (155 bytes, the layout the engine and the editor use;
 // buffers are 156 bytes, the last one is unused).
 void dx7PackPatch(const uint8_t* unpacked, uint8_t* packed);
+// The DX7 "INIT VOICE" : one sine carrier, as unpacked VCED
+void dx7InitVoice(uint8_t* unpacked);
 void dx7UnpackPatch(const uint8_t* packed, uint8_t* unpacked);
 
 // Generates patch 'index' (0..31) of the virtual random bank 'mode' identified

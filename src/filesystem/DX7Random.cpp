@@ -73,6 +73,35 @@ void dx7PackPatch(const uint8_t* u, uint8_t* p) {
     }
 }
 
+void dx7InitVoice(uint8_t* u) {
+    for (int k = 0; k < 156; k++) {
+        u[k] = 0;
+    }
+    for (int slot = 0; slot < 6; slot++) {
+        uint8_t* o = &u[slot * 21];
+        o[0] = 99; o[1] = 99; o[2] = 99; o[3] = 99;      // rates
+        o[4] = 99; o[5] = 99; o[6] = 99; o[7] = 0;       // levels
+        o[8] = 39;                                       // break point C3
+        o[16] = (slot == 5) ? 99 : 0;                    // only operator 1 is heard
+        o[18] = 1;                                       // coarse x1
+        o[20] = 7;                                       // detune centre
+    }
+    for (int i = 0; i < 4; i++) {
+        u[126 + i] = 99;
+        u[130 + i] = 50;
+    }
+    u[134] = 0;                                          // algorithm 1
+    u[136] = 1;                                          // osc key sync
+    u[137] = 35;                                         // LFO speed
+    u[141] = 1;                                          // LFO key sync
+    u[143] = 3;                                          // pitch mod sens
+    u[144] = 24;                                         // transpose C3
+    const char* name = "INIT VOICE";
+    for (int k = 0; k < 10; k++) {
+        u[145 + k] = name[k];
+    }
+}
+
 // Packed to unpacked VCED. Same routine as Hexter::patchUnpack.
 void dx7UnpackPatch(const uint8_t* packed_patch, uint8_t* unpacked_patch) {
     const uint8_t *pp = packed_patch;
