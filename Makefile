@@ -110,6 +110,16 @@ SRC_FIRMWARE:=src/PreenFM.cpp \
 	src/library/ff14/src/ff.c \
 	src/midipal/note_stack.cpp \
 	src/midipal/event_scheduler.cpp \
+	src/synth/Dx7Engine.cpp \
+	src/msfa/msfa_sin.cpp \
+	src/msfa/msfa_exp2.cpp \
+	src/msfa/msfa_freqlut.cpp \
+	src/msfa/msfa_env.cpp \
+	src/msfa/msfa_pitchenv.cpp \
+	src/msfa/msfa_lfo.cpp \
+	src/msfa/msfa_fm_op_kernel.cpp \
+	src/msfa/msfa_fm_core.cpp \
+	src/msfa/msfa_dx7note.cpp \
 
 
 include_cvin_files:=
@@ -167,7 +177,7 @@ SRC_BOOTLOADER:=src/bootloader/BootLoader.cpp \
 	src/library/STM32_USB_Device_Library/Class/msc/src/usbd_msc_scsi.c \
 	src/library/STM32F4xx_StdPeriph_Driver/src/misc.c
 
-INCLUDESDIR := -I./src/third/ -I./src/library/STM32_USB_HOST_Library/Class/MSC/inc -I./src/library/STM32_USB_HOST_Library/Core/inc -I./src/library/STM32_USB_OTG_Driver/inc -I./src/library/ff14 -I./src/library/STM32_USB_Device_Library/Core/inc -I./src/library/STM32_USB_Device_Library/Class/midi/inc -I./src/library/STM32F4xx_StdPeriph_Driver/inc/ -I./src/library/CMSIS/Include/ -I./src/utils/ -I./src/filesystem -I./src/hardware -I./src/usb -I./src/synth -I./src/midi -I./src/midipal -I./src -I./src/library/STM32_USB_Device_Library/Class/msc/inc
+INCLUDESDIR := -I./src/third/ -I./src/library/STM32_USB_HOST_Library/Class/MSC/inc -I./src/library/STM32_USB_HOST_Library/Core/inc -I./src/library/STM32_USB_OTG_Driver/inc -I./src/library/ff14 -I./src/library/STM32_USB_Device_Library/Core/inc -I./src/library/STM32_USB_Device_Library/Class/midi/inc -I./src/library/STM32F4xx_StdPeriph_Driver/inc/ -I./src/library/CMSIS/Include/ -I./src/utils/ -I./src/filesystem -I./src/hardware -I./src/usb -I./src/synth -I./src/midi -I./src/midipal -I./src -I./src/library/STM32_USB_Device_Library/Class/msc/inc -I./src/msfa
 SMALLBINOPTS := -mfpu=fpv4-sp-d16 -ffunction-sections -fdata-sections -fno-rtti -fno-exceptions  -Wl,--gc-sections
 
 #
@@ -340,6 +350,10 @@ build/%.o: src/library/ff14/%.c
 build/%.o: src/midipal/%.cpp
 	@echo "Compiling $<..."
 	@$(CC) $(CFLAGS)  $< -o $@
+
+build/%.o: src/msfa/%.cpp
+	@echo "Compiling $<..."
+	@$(CC) $(CFLAGS) $< -o $@
 
 
 clean:

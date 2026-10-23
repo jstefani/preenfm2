@@ -547,6 +547,11 @@ public:
     void propagateAfterNewParamsLoad(int timbre);
     void propagateAfterNewComboLoad();
     void propagateNewTimbre(int timbre);
+    // DX7 engine : the packed sysex patch is handed to the synth after the
+    // converted params have been loaded, so the timbre runs the DX7 engine.
+    void propagateNewDx7Patch(int timbre, uint8_t* packedPatch);
+    void backupTimbreEngine(int timbre);
+    void restoreTimbreEngine(int timbre);
 
     SynthEditMode getSynthMode() {
         return fullState.synthMode;
@@ -582,6 +587,9 @@ public:
     int currentTimbre;
     struct OneSynthParams *params;
     struct OneSynthParams backupParams;
+    // Per timbre : 0 = preenfm2 engine, 1 = DX7 engine (patch data in SynthState.cpp)
+    uint8_t timbreEngine[NUMBER_OF_TIMBRES];
+    uint8_t backupEngine;
     struct FullState fullState;
     char stepSelect[2];
     char patternSelect;

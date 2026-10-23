@@ -37,6 +37,7 @@
 
 extern float panTable[];
 class Voice;
+class Dx7Engine;
 
 enum {  CLOCK_OFF,
     CLOCK_INTERNAL,
@@ -104,6 +105,14 @@ public:
 
     void setHoldPedal(int value);
 
+    // DX7 engine (msfa) : when dx7Mode is set the timbre's notes are played
+    // by the DX7 engine instead of the preenfm2 voices.
+    void setDx7Engine(Dx7Engine* engine) { this->dx7 = engine; }
+    void setDx7Mode(bool mode) { this->dx7Mode = mode; }
+    bool isDx7Mode() { return this->dx7Mode; }
+    void dx7PitchBend(int value14);
+    void dx7ModWheel(int value7);
+
 
     void resetMatrixDestination(float oldValue);
     void setMatrixSource(enum SourceEnum source, float newValue);
@@ -169,6 +178,8 @@ private:
     float mixerGain;
     Voice *voices[MAX_NUMBER_OF_VOICES];
     bool holdPedal;
+    Dx7Engine* dx7;
+    bool dx7Mode;
     uint8_t lastPlayedVoiceNum;
 #ifdef CVIN
     float cvFrequency;

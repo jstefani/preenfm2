@@ -19,6 +19,7 @@
 #include <math.h>
 #include "Timbre.h"
 #include "Voice.h"
+#include "Dx7Engine.h"
 
 #define INV127 .00787401574803149606f
 #define INV16 .0625f
@@ -575,6 +576,8 @@ void Timbre::init(int timbreNumber, SynthState* sState) {
 	osc6.init(sState, &params.osc6, OSC6_FREQ);
 
     this->timbreNumber = timbreNumber;
+    this->dx7 = 0;
+    this->dx7Mode = false;
 
     for (int s=0; s<2; s++) {
         for (int n=0; n<128; n++) {
@@ -620,6 +623,11 @@ int cptHighNote = 0;
 void Timbre::preenNoteOn(uint8_t note, uint8_t velocity) {
 
 	this->lastVelocity = velocity * INV127;
+
+	if (unlikely(dx7Mode)) {
+		dx7->noteOn(timbreNumber, note, velocity, (int) params.engine1.numberOfVoice);
+		return;
+	}
 	bool isUnison = params.engine1.numberOfVoice > 1  && params.engine2.playMode == 2.0f;
 
 	int iNov;
@@ -787,6 +795,10 @@ void Timbre::propagateCvFreq(uint8_t note) {
 #endif
 
 void Timbre::preenNoteOff(uint8_t note) {
+	if (unlikely(dx7Mode)) {
+		dx7->noteOff(timbreNumber, note);
+		return;
+	}
 	bool isUnison = params.engine1.numberOfVoice > 1  && params.engine2.playMode == 2.0f;
 
 	int iNov = (int) params.engine1.numberOfVoice;
@@ -834,6 +846,9 @@ void Timbre::preenNoteOff(uint8_t note) {
 }
 
 void Timbre::stopPlayingNow() {
+	if (dx7 != 0) {
+		dx7->allSoundOff(timbreNumber);
+	}
 	int iNov = (int) params.engine1.numberOfVoice;
 	for (int k = 0; k < iNov; k++) {
 		// voice number k of timbre
@@ -844,8 +859,23 @@ void Timbre::stopPlayingNow() {
     }
 }
 
+void Timbre::dx7PitchBend(int value14) {
+	if (unlikely(dx7Mode)) {
+		dx7->setPitchBend(timbreNumber, value14);
+	}
+}
+
+void Timbre::dx7ModWheel(int value7) {
+	if (unlikely(dx7Mode)) {
+		dx7->setModWheel(timbreNumber, value7);
+	}
+}
+
 
 void Timbre::setHoldPedal(int value) {
+	if (unlikely(dx7Mode)) {
+		dx7->setHoldPedal(timbreNumber, value >= 64);
+	}
 	if (value <64) {
 		holdPedal = false;
 	    int numberOfVoices = params.engine1.numberOfVoice;
@@ -927,6 +957,9 @@ void Timbre::prepareMatrixForNewBlock() {
 }
 
 uint8_t Timbre::voicesNextBlock() {
+    if (unlikely(dx7Mode)) {
+        return dx7->render(timbreNumber, sampleBlock);
+    }
     uint8_t numberOfPlayingVoices = 0;
 	bool isUnison = params.engine1.numberOfVoice > 1  && params.engine2.playMode == 2.0f;
     if (unlikely(!isUnison)) {

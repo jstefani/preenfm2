@@ -32,6 +32,8 @@
 #include "SynthParamListener.h"
 #include "SynthStateAware.h"
 
+class Dx7Engine;
+
 #define UINT_MAX  4294967295
 
 class Synth : public SynthParamListener, public SynthStateAware, public SynthParamChecker, public SynthMenuListener
@@ -62,6 +64,8 @@ public:
     void allSoundOff();
     void allSoundOff(int timbre);
     void allNoteOffQuick();
+    // DX7 engine (msfa) : a DX7 sysex patch was loaded into timbre
+    void newDx7Patch(int timbre, uint8_t* packedPatch);
     bool isPlaying();
     void buildNewSampleBlock();
     void buildNewSampleBlockMcp4922();
@@ -224,6 +228,8 @@ private:
     uint32_t playingNotes;
     // Incremented for every rendered block; used to wait for voice fade-out
     volatile uint32_t blockCount;
+    // DX7 engine, shared by all timbres
+    Dx7Engine* dx7;
 #ifdef CVIN
     bool cvin12Ready ;
     bool cvin34Ready ;

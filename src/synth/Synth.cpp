@@ -20,6 +20,7 @@
 #include "Menu.h"
 // PCB_R5 and fillSoundBuffer() (defined in PreenFM_irq.cpp)
 #include "PreenFM.h"
+#include "Dx7Engine.h"
 #include "stm32f4xx_rng.h"
 
 
@@ -53,6 +54,13 @@ void Synth::init(SynthState* sState) {
         for (int v=0; v<MAX_NUMBER_OF_VOICES; v++) {
             timbres[t].initVoicePointer(v, &voices[v]);
         }
+    }
+
+    // DX7 engine : one instance shared by all timbres, in main RAM
+    this->dx7 = &dx7Engine;
+    this->dx7->init(PREENFM_FREQUENCY);
+    for (int t=0; t<NUMBER_OF_TIMBRES; t++) {
+        timbres[t].setDx7Engine(this->dx7);
     }
 
     newTimbre(0);
@@ -108,6 +116,7 @@ void Synth::allNoteOff(int timbre) {
             voices[n].noteOff();
         }
     }
+    dx7->allNoteOff(timbre);
 }
 
 void Synth::allSoundOff(int timbre) {
@@ -117,12 +126,14 @@ void Synth::allSoundOff(int timbre) {
         int n = timbres[timbre].voiceNumber[k];
         voices[n].killNow();
     }
+    dx7->allSoundOff(timbre);
 }
 
 void Synth::allSoundOff() {
     for (int k = 0; k < MAX_NUMBER_OF_VOICES; k++) {
         voices[k].killNow();
     }
+    dx7->allSoundOff();
 }
 
 // Fade out every playing voice in a few blocks (see Voice::noteOffQuick).
@@ -132,6 +143,7 @@ void Synth::allNoteOffQuick() {
     for (int k = 0; k < MAX_NUMBER_OF_VOICES; k++) {
         voices[k].noteOffQuick();
     }
+    dx7->allNoteOffQuick();
 }
 
 bool Synth::isPlaying() {
@@ -140,7 +152,7 @@ bool Synth::isPlaying() {
             return true;
         }
     }
-    return false;
+    return dx7->isPlaying();
 }
 
 
@@ -422,6 +434,11 @@ int Synth::getNumberOfFreeVoicesForThisTimbre(int timbre) {
 }
 
 void Synth::afterNewParamsLoad(int timbre) {
+    // A preenfm2 patch, or a DX7 patch converted by hexter : native engine.
+    // newDx7Patch() follows when the DX7 engine must play it instead.
+    timbres[timbre].setDx7Mode(false);
+    dx7->deactivateTimbre(timbre);
+
     // Reset to 0 the number of voice then try to set the right value
     int numberOfVoice = timbres[timbre].params.engine1.numberOfVoice;
     int voicesMax = getNumberOfFreeVoicesForThisTimbre(timbre);
@@ -437,7 +454,17 @@ void Synth::afterNewParamsLoad(int timbre) {
 
 }
 
+void Synth::newDx7Patch(int timbre, uint8_t* packedPatch) {
+    dx7->setTimbrePatch(timbre, packedPatch);
+    timbres[timbre].setDx7Mode(true);
+}
+
 void Synth::afterNewComboLoad() {
+    // Combos only hold preenfm2 patches : native engine everywhere
+    for (int t=0; t<NUMBER_OF_TIMBRES ; t++) {
+        timbres[t].setDx7Mode(false);
+        dx7->deactivateTimbre(t);
+    }
 
 
     // If combo have been saved with 16 voices
@@ -483,6 +510,8 @@ void Synth::updateNumberOfActiveTimbres() {
         activeTimbres ++;
     }
     ratioTimbre = ratiosTimbre[activeTimbres];
+    // DX7 engine full scale is 2^28 (as in Dexed) : map it to the timbre float range
+    dx7->setOutputScale(ratioTimbre * (1.0f / 268435456.0f));
 }
 
 int Synth::getFreeVoice() {

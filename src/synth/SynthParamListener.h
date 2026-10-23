@@ -19,6 +19,8 @@
 #ifndef SYNTHPARAMLISTENER_H_
 #define SYNTHPARAMLISTENER_H_
 
+#include <stdint.h>
+
 
 enum ParameterDisplayType {
     DISPLAY_TYPE_NONE = 0,
@@ -63,6 +65,8 @@ public:
     virtual void stopNote(int timbre, char note) = 0;
 
     virtual void newPresetName(int timbre) {};
+    // A DX7 sysex patch was loaded into timbre : run it on the DX7 engine
+    virtual void newDx7Patch(int timbre, uint8_t* packedPatch) {};
 
     SynthParamListener* nextListener;
 };

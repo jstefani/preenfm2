@@ -37,6 +37,8 @@ const char* usbMidi[] = { "Off", "In", "In/Out" };
 const char* operatorButton[] = { "New", "Old" };
 const char* version[] = { PFM2_VERSION""CVIN_STRING};
 const char* oledSaver[] = { "Off", "2m", "5m", "10m", "1h" };
+// DX7 sysex patches : played by the DX7 engine, or converted to a preenfm2 patch
+const char* dx7EngineNames[] = { "Native", "Convert" };
 
 const char* globalTuning[] = { "G" };
 const char* inst1[] = { "Off", "1", "2", "3", "4", "12", "123", "1234", "seq", "rand", "cv3"};
@@ -205,6 +207,12 @@ const struct MidiConfig midiConfig[]  = {
                 "readsysex",
                 2,
                 noYes
+        },
+        {
+                "DX7 Engine: ",
+                "dx7engine",
+                2,
+                dx7EngineNames
         },
         // Don't count in MIDICONFIG_SIZE
         {

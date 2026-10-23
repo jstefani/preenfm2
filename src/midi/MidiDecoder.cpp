@@ -279,6 +279,7 @@ void MidiDecoder::midiEventReceived(MidiEvent midiEvent) {
         for (int tk = 0; tk< timbreIndex; tk++ ) {
             int pb = ((int) midiEvent.value[1] << 7) + (int) midiEvent.value[0] - 8192;
             this->synth->getTimbre(timbres[tk])->setMatrixSource(MATRIX_SOURCE_PITCHBEND, (float)pb * .00012207031250000000f  );
+            this->synth->getTimbre(timbres[tk])->dx7PitchBend(pb + 8192);
         }
         break;
     case MIDI_PROGRAM_CHANGE:
@@ -308,6 +309,7 @@ void MidiDecoder::controlChange(int timbre, MidiEvent& midiEvent) {
         break;
     case CC_MODWHEEL:
         this->synth->getTimbre(timbre)->setMatrixSource(MATRIX_SOURCE_MODWHEEL, INV127 * midiEvent.value[1]);
+        this->synth->getTimbre(timbre)->dx7ModWheel(midiEvent.value[1]);
         break;
     case CC_BREATH:
         this->synth->getTimbre(timbre)->setMatrixSource(MATRIX_SOURCE_BREATH, INV127 * midiEvent.value[1]);

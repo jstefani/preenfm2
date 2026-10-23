@@ -26,6 +26,13 @@ extern LiquidCrystal      lcd;
 extern Synth synth;
 
 #define NULL 0
+
+// DX7 engine : packed sysex patch per timbre + backup for the menu "undo".
+// File scope so they live in main RAM : SynthState itself is in CCM.
+#define ENGINE_PREENFM 0
+#define ENGINE_DX7 1
+static uint8_t dx7PackedPatches[NUMBER_OF_TIMBRES][128];
+static uint8_t backupDx7PackedPatch[128];
 // FLASH :  __attribute__ ((section (".USER_FLASH")))
 // Ex : const char* nullNames [] __attribute__ ((section (".USER_FLASH")))= {};
 // DISPLAY structures
@@ -706,6 +713,10 @@ struct AllParameterRowsDisplay allParameterRows = {
 
 
 SynthState::SynthState() {
+    for (int t = 0; t < NUMBER_OF_TIMBRES; t++) {
+        timbreEngine[t] = ENGINE_PREENFM;
+    }
+    backupEngine = ENGINE_PREENFM;
     engineRow =  0;
     // operator works for both osc and env
     oscillatorRow  = 0;
@@ -739,6 +750,7 @@ SynthState::SynthState() {
     fullState.midiConfigValue[MIDICONFIG_CV_GATE] = 50;
 #endif
     fullState.midiConfigValue[MIDICONFIG_USB] = 2;
+    fullState.midiConfigValue[MIDICONFIG_DX7_ENGINE] = 0;
 	fullState.midiConfigValue[MIDICONFIG_GLOBAL] = 0;
 	fullState.midiConfigValue[MIDICONFIG_CURRENT_INSTRUMENT] = 0;
     fullState.midiConfigValue[MIDICONFIG_CHANNEL1] = 1;
@@ -1465,8 +1477,16 @@ void SynthState::loadDx7Patch(int timbre, PFM2File const *bank, int patchNumber,
     storeTestNote();
     propagateNoteOff();
     propagateBeforeNewParamsLoad(timbre);
-    hexter->loadHexterPatch(storage->getDX7SysexFile()->dx7LoadPatch(bank, patchNumber), params);
+    uint8_t* packedPatch = storage->getDX7SysexFile()->dx7LoadPatch(bank, patchNumber);
+    if (packedPatch != 0) {
+        // Always convert : the display and the "Convert" setting use the result
+        hexter->loadHexterPatch(packedPatch, params);
+    }
     propagateAfterNewParamsLoad(timbre);
+    if (packedPatch != 0 && fullState.midiConfigValue[MIDICONFIG_DX7_ENGINE] == 0) {
+        // Native : play the real DX7 data on the DX7 engine
+        propagateNewDx7Patch(timbre, packedPatch);
+    }
     restoreTestNote();
 }
 
@@ -1733,6 +1753,7 @@ void SynthState::buttonPressed(int button) {
             fullState.menuSelect = fullState.firstMenu;
             // allow undo event after trying some patches
             copySynthParams((char*)params, (char*)&backupParams);
+            backupTimbreEngine(currentTimbre);
             fullState.currentMenuItem = MenuItemUtil::getMenuItem(MAIN_MENU);
             break;
         case BUTTON_BACK:
@@ -1884,11 +1905,13 @@ const MenuItem* SynthState::afterButtonPressed() {
     case MENU_LOAD_SELECT_COMBO_PRESET:
         loadPreenFMCombo(fullState.preenFMCombo, fullState.menuSelect);
         copySynthParams((char*)params, (char*)&backupParams);
+        backupTimbreEngine(currentTimbre);
         break;
     case MENU_LOAD_SELECT_DX7_PRESET:
     case MENU_LOAD_SELECT_BANK_PRESET:
     case MENU_LOAD_RANDOMIZER:
         copySynthParams((char*)params, (char*)&backupParams);
+        backupTimbreEngine(currentTimbre);
         break;
     case MENU_SAVE_SELECT_BANK_PRESET:
         for (int k=0; k<12; k++) {
@@ -2239,6 +2262,7 @@ const MenuItem* SynthState::menuBack() {
         propagateBeforeNewParamsLoad(currentTimbre);
         copySynthParams((char*)&backupParams, (char*)params);
         propagateAfterNewParamsLoad(currentTimbre);
+        restoreTimbreEngine(currentTimbre);
         break;
     case MENU_LOAD_RANDOMIZER:
         // Put back original preset
@@ -2246,6 +2270,7 @@ const MenuItem* SynthState::menuBack() {
         propagateBeforeNewParamsLoad(currentTimbre);
         copySynthParams((char*)&backupParams, (char*)params);
         propagateAfterNewParamsLoad(currentTimbre);
+        restoreTimbreEngine(currentTimbre);
         break;
     case MENU_LOAD_SELECT_BANK_PRESET:
         propagateNoteOff();
@@ -2253,6 +2278,7 @@ const MenuItem* SynthState::menuBack() {
         propagateBeforeNewParamsLoad(currentTimbre);
         copySynthParams((char*)&backupParams, (char*)params);
         propagateAfterNewParamsLoad(currentTimbre);
+        restoreTimbreEngine(currentTimbre);
         break;
     case MENU_LOAD_SELECT_DX7_PRESET:
         propagateNoteOff();
@@ -2260,6 +2286,7 @@ const MenuItem* SynthState::menuBack() {
         propagateBeforeNewParamsLoad(currentTimbre);
         copySynthParams((char*)&backupParams, (char*)params);
         propagateAfterNewParamsLoad(currentTimbre);
+        restoreTimbreEngine(currentTimbre);
         break;
     case MAIN_MENU:
         fullState.synthMode = SYNTH_MODE_EDIT;
@@ -2275,12 +2302,16 @@ const MenuItem* SynthState::menuBack() {
 
 
 void SynthState::propagateAfterNewParamsLoad(int timbre) {
+    timbreEngine[timbre] = ENGINE_PREENFM;
     for (SynthParamListener* listener = firstParamListener; listener !=0; listener = listener->nextListener) {
         listener->afterNewParamsLoad(timbre);
     }
 }
 
 void SynthState::propagateAfterNewComboLoad() {
+    for (int t = 0; t < NUMBER_OF_TIMBRES; t++) {
+        timbreEngine[t] = ENGINE_PREENFM;
+    }
     for (SynthParamListener* listener = firstParamListener; listener !=0; listener = listener->nextListener) {
         listener->afterNewComboLoad();
     }
@@ -2290,6 +2321,29 @@ void SynthState::propagateNewTimbre(int timbre) {
     propagateNoteOff();
     for (SynthParamListener* listener = firstParamListener; listener !=0; listener = listener->nextListener) {
         listener->newTimbre(timbre);
+    }
+}
+
+void SynthState::propagateNewDx7Patch(int timbre, uint8_t* packedPatch) {
+    for (int k = 0; k < 128; k++) {
+        dx7PackedPatches[timbre][k] = packedPatch[k];
+    }
+    timbreEngine[timbre] = ENGINE_DX7;
+    for (SynthParamListener* listener = firstParamListener; listener !=0; listener = listener->nextListener) {
+        listener->newDx7Patch(timbre, dx7PackedPatches[timbre]);
+    }
+}
+
+void SynthState::backupTimbreEngine(int timbre) {
+    backupEngine = timbreEngine[timbre];
+    for (int k = 0; k < 128; k++) {
+        backupDx7PackedPatch[k] = dx7PackedPatches[timbre][k];
+    }
+}
+
+void SynthState::restoreTimbreEngine(int timbre) {
+    if (backupEngine == ENGINE_DX7) {
+        propagateNewDx7Patch(timbre, backupDx7PackedPatch);
     }
 }
 

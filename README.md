@@ -35,6 +35,21 @@ make installdfu
 
 Once it's done, unplug the power cable and plug it back.
 
+## DX7 engine (branch dx7-msfa-engine)
+
+DX7 sysex patches can be played by a port of the msfa engine used by Dexed
+(see `src/msfa/README.md`) instead of being converted to a preenfm2 patch.
+
+* **Settings > DX7 Engine**: `Native` (default) plays DX7 banks on the DX7
+  engine, `Convert` keeps the historical hexter conversion.
+* The engine is chosen per timbre by the patch loaded into it: a DX7 bank
+  patch runs on the DX7 engine, a preenfm2 patch runs on the preenfm2 engine.
+  Existing preenfm2 patches are unaffected.
+* Up to 8 DX7 voices are shared by all timbres. Pitch bend, mod wheel
+  (vibrato), hold pedal, the arpeggiator and the per-timbre filter/gain/pan
+  stage work. Editing the displayed (converted) parameters does not change
+  a DX7 timbre's sound yet; combos only store preenfm2 patches.
+
 ## New Filters in 2.11
 
 Many effects have been added in the firmware 2.11. They were coded by [Toltekradiation](http://ixox.fr/forum/index.php?topic=69544.0).
