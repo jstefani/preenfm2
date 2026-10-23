@@ -222,6 +222,8 @@ private:
 
     float cpuUsage;
     uint32_t playingNotes;
+    // Incremented for every rendered block; used to wait for voice fade-out
+    volatile uint32_t blockCount;
 #ifdef CVIN
     bool cvin12Ready ;
     bool cvin34Ready ;

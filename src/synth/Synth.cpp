@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include "Synth.h"
 #include "Menu.h"
+// PCB_R5 and fillSoundBuffer() (defined in PreenFM_irq.cpp)
+#include "PreenFM.h"
 #include "stm32f4xx_rng.h"
 
 
@@ -54,6 +56,7 @@ void Synth::init(SynthState* sState) {
     }
 
     newTimbre(0);
+    this->blockCount = 0;
     this->writeCursor = 0;
     this->readCursor = 0;
     for (int k = 0; k < MAX_NUMBER_OF_VOICES; k++) {
@@ -237,6 +240,7 @@ void Synth::buildNewSampleBlockMcp4922() {
 
 
 void Synth::buildNewSampleBlock() {
+    blockCount++;
 
     // We consider the random number is always ready here...
     uint32_t random32bit = RNG_GetRandomNumber();
@@ -372,13 +376,32 @@ void Synth::buildNewSampleBlock() {
 }
 
 void Synth::beforeNewParamsLoad(int timbre) {
+    // Fade out every playing voice instead of cutting them : killNow()
+    // on a ringing voice drops the output to 0 in one sample = click.
+    allNoteOffQuick();
+
+    // Wait for the quick release to finish before touching params or
+    // voice/timbre assignment : 6 blocks of release + 1 for the voice to
+    // end itself + 1 margin, about 6 ms.
+    // We are in the main loop. With CS4344 the DMA IRQ keeps rendering
+    // blocks on its own; with MCP4922 (PCB R5) the main loop must render
+    // them, so call fillSoundBuffer() while waiting.
+    // The iteration cap only protects against a hang if audio is not running.
+    bool mcp4922 = (synthState->getPcbVersion() == PCB_R5);
+    uint32_t blockCountStart = blockCount;
+    for (int safety = 0; safety < 1000000 && (uint32_t)(blockCount - blockCountStart) < 8; safety++) {
+        if (mcp4922) {
+            fillSoundBuffer();
+        }
+    }
+
     for (int t=0; t<NUMBER_OF_TIMBRES; t++) {
         timbres[t].resetArpeggiator();
         for (int v=0; v<MAX_NUMBER_OF_VOICES; v++) {
             timbres[t].setVoiceNumber(v, -1);
         }
     }
-    // Stop all voices
+    // Voices are silent now; make sure every one of them is reset
     allSoundOff();
 };
 
