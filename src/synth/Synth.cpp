@@ -510,8 +510,6 @@ void Synth::updateNumberOfActiveTimbres() {
         activeTimbres ++;
     }
     ratioTimbre = ratiosTimbre[activeTimbres];
-    // DX7 engine full scale is 2^28 (as in Dexed) : map it to the timbre float range
-    dx7->setOutputScale(ratioTimbre * (1.0f / 268435456.0f));
 }
 
 int Synth::getFreeVoice() {

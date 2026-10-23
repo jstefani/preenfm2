@@ -75,9 +75,8 @@ public:
     void setPitchBend(int timbre, int value14);
     void setModWheel(int timbre, int value7);
 
-    // Audio. Adds the timbre's voices into its stereo float block.
-    // outputScale maps the engine's integer output to the preenfm2 float
-    // range for the current number of active timbres.
+    // Audio. Adds the timbre's voices into its stereo float block, at the
+    // same level as the preenfm2 voices (the timbre gain stage follows).
     void setOutputScale(float scale) { outputScale = scale; }
     int render(int timbre, float* stereoBlock);
 

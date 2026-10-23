@@ -43,7 +43,12 @@ void Dx7Engine::init(float sampleRate) {
         }
     }
     voiceIndex = 1;
-    outputScale = 0.0f;
+    // The timbre block is at "voice level" : one preenfm2 voice at full
+    // amplitude is about +-1 and Timbre::fxAfterBlock applies the mixer gain
+    // (which already divides by the number of voices) to reach DAC level.
+    // Dexed treats 2^28 as full scale; 2^27 makes a single carrier at level
+    // 99 about -12 dB, in line with the native engine.
+    outputScale = 1.0f / 134217728.0f;
 }
 
 // DX7 packed (128 bytes, as in a 32 voice sysex bank) to unpacked (155 bytes)
