@@ -61,6 +61,7 @@ public:
     void allNoteOff(int timbre);
     void allSoundOff();
     void allSoundOff(int timbre);
+    void allNoteOffQuick();
     bool isPlaying();
     void buildNewSampleBlock();
     void buildNewSampleBlockMcp4922();

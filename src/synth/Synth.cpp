@@ -122,6 +122,15 @@ void Synth::allSoundOff() {
     }
 }
 
+// Fade out every playing voice in a few blocks (see Voice::noteOffQuick).
+// Covers all voices, not one timbre, because a preset load rebuilds the
+// voice/timbre assignment and may move a voice to another timbre.
+void Synth::allNoteOffQuick() {
+    for (int k = 0; k < MAX_NUMBER_OF_VOICES; k++) {
+        voices[k].noteOffQuick();
+    }
+}
+
 bool Synth::isPlaying() {
     for (int k = 0; k < MAX_NUMBER_OF_VOICES; k++) {
         if (voices[k].isPlaying()) {
