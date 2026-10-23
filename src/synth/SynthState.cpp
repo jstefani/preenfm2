@@ -1527,7 +1527,8 @@ void SynthState::loadPreenFMPatchFromMidi(int timbre, int bank, int bankLSB, int
     case 4:
     {
         int dx7bank = bank - 2;
-        PFM2File const *bank = storage->getDX7SysexFile()->getFile(bankLSB + dx7bank * 128);
+        // + 1 : index 0 is the virtual random bank, MIDI bank numbers address the files
+        PFM2File const *bank = storage->getDX7SysexFile()->getFile(bankLSB + dx7bank * 128 + 1);
         if (bank->fileType != FILE_EMPTY && patchNumber < 32) {
             fullState.dx7BankNumber = bankLSB;
             fullState.dx7PresetNumber = patchNumber;
@@ -1899,6 +1900,10 @@ const MenuItem* SynthState::afterButtonPressed() {
     case MENU_LOAD_SELECT_DX7_BANK:
         if (fullState.dx7Bank->fileType != FILE_OK) {
             return fullState.currentMenuItem;
+        }
+        if (storage->getDX7SysexFile()->isRandomBank(fullState.dx7Bank)) {
+            // Entering the virtual random bank : generate a new one
+            storage->getDX7SysexFile()->newRandomBank();
         }
         fullState.dx7BankNumber = fullState.menuSelect;
         break;

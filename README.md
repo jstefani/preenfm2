@@ -45,6 +45,9 @@ DX7 sysex patches can be played by a port of the msfa engine used by Dexed
 * The engine is chosen per timbre by the patch loaded into it: a DX7 bank
   patch runs on the DX7 engine, a preenfm2 patch runs on the preenfm2 engine.
   Existing preenfm2 patches are unaffected.
+* Load > DX7: the first bank, `*Random*`, is virtual. Selecting it generates
+  a new bank of 32 random DX7 patches (name shows the character: PRC, KEY, PAD,
+  LED); browse them like any bank. MIDI bank numbers still address the files.
 * Up to 8 DX7 voices are shared by all timbres. Pitch bend, mod wheel
   (vibrato), hold pedal, the arpeggiator and the per-timbre filter/gain/pan
   stage work. Editing the displayed (converted) parameters does not change

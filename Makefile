@@ -89,6 +89,7 @@ SRC_FIRMWARE:=src/PreenFM.cpp \
 	src/filesystem/FileSystemUtils.cpp \
 	src/filesystem/PreenFMFileType.cpp \
 	src/filesystem/UserWaveform.cpp \
+	src/filesystem/DX7Random.cpp \
 	src/midi/MidiDecoder.cpp \
 	src/synth/Env.cpp \
 	src/synth/Lfo.cpp \
