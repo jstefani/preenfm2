@@ -51,7 +51,6 @@ void FMDisplay::init(LiquidCrystal* lcd, Storage* storage, float ticksPerMinute)
     customCharsInit();
     screenSaveTimer = 0;
     screenSaverMode = false;
-    menuRedrawPending = false;
 
     screenSaverGoal[0] =  2 * ticksPerMinute;
     screenSaverGoal[1] =  5 * ticksPerMinute;
@@ -890,8 +889,9 @@ void FMDisplay::drawMenuLevel(const MenuItem* item, int selectedChild, FullState
     }
 }
 
-// Rebuilds the menu screen after the screen saver blanked it : every
-// ancestor level from the main menu down, then the current one.
+// Draws the menu screen from scratch : every ancestor level from the main
+// menu down, then the current one. Used when entering menu mode and when
+// waking from the screen saver inside a nested menu.
 void FMDisplay::redrawMenu(FullState* fullState) {
     const MenuItem* chain[8];
     int depth = 0;
@@ -921,13 +921,6 @@ void FMDisplay::redrawMenu(FullState* fullState) {
 }
 
 void FMDisplay::newMenuState(FullState* fullState) {
-    if (unlikely(screenSaverMode || menuRedrawPending)) {
-        screenSaverMode = false;
-        menuRedrawPending = false;
-        screenSaveTimer = 0;
-        redrawMenu(fullState);
-        return;
-    }
     menuRow += rowInc(fullState->currentMenuItem->menuState);
     if (fullState->currentMenuItem->hasSubMenu) {
         int pos = 0;
@@ -1025,12 +1018,6 @@ void FMDisplay::displayPatchSelect(int presetNumber, const char* name) {
 
 
 void FMDisplay::newMenuSelect(FullState* fullState) {
-    if (unlikely(screenSaverMode)) {
-        screenSaverMode = false;
-        screenSaveTimer = 0;
-        redrawMenu(fullState);
-        return;
-    }
     screenSaveTimer = 0;
     lcd->noCursor();
 
@@ -1195,13 +1182,6 @@ void FMDisplay::eraseRow(int row) {
 }
 
 void FMDisplay::menuBack(enum MenuState oldMenuState, FullState* fullState) {
-    if (unlikely(screenSaverMode)) {
-        // Blanked : the new state that follows rebuilds the whole screen
-        screenSaverMode = false;
-        menuRedrawPending = true;
-        screenSaveTimer = 0;
-        return;
-    }
     screenSaveTimer = 0;
     if (fullState->currentMenuItem->menuState == MENU_DONE
             || fullState->currentMenuItem->menuState == MENU_ERROR
@@ -1270,8 +1250,8 @@ void FMDisplay::tempoClick() {
     }
     if (unlikely(synthState->fullState.midiConfigValue[MIDICONFIG_OLED_SAVER] > 0)) {
         if (!screenSaverMode) {
-            // Edit and menu screens alike : a blanked menu is rebuilt by
-            // redrawMenu() on the next encoder or button
+            // Edit and menu screens alike : the next encoder or button is
+            // consumed by SynthState, which asks for a full redraw
             screenSaveTimer ++;
             if (screenSaveTimer > screenSaverGoal[synthState->fullState.midiConfigValue[MIDICONFIG_OLED_SAVER] - 1]) {
                 lcd->clearActions();

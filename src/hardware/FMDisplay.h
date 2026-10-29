@@ -179,8 +179,6 @@ private:
 	bool algoCounterForIMInformation;
 	unsigned screenSaveTimer;
 	bool screenSaverMode;
-	// Woken up by Back while blanked : the next menu state draws everything
-	bool menuRedrawPending;
 };
 
 #endif /* FMDISPLAY_H_ */
