@@ -963,6 +963,7 @@ void FMDisplay::drawMenuLevel(const MenuItem* item, int selectedChild, FullState
         displayBankSelect(fullState->preenFMComboNumber, (fullState->preenFMCombo->fileType != FILE_EMPTY), fullState->preenFMCombo->name);
         break;
     case MENU_LOAD_SELECT_DX7_BANK:
+    case MENU_SAVE_SELECT_DX7_BANK:
         displayBankSelect(fullState->dx7BankNumber, (fullState->dx7Bank->fileType != FILE_EMPTY), fullState->dx7Bank->name);
         break;
     case MENU_CONFIG_SETTINGS:
