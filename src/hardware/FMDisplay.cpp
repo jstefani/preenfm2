@@ -52,6 +52,7 @@ void FMDisplay::init(LiquidCrystal* lcd, Storage* storage, float ticksPerMinute)
     customCharsInit();
     screenSaveTimer = 0;
     screenSaverMode = false;
+    menuRedrawPending = false;
 
     screenSaverGoal[0] =  2 * ticksPerMinute;
     screenSaverGoal[1] =  5 * ticksPerMinute;
@@ -935,7 +936,84 @@ int FMDisplay::rowInc(MenuState menuState) {
     return 1;
 }
 
+// Draws one level of the menu on menuRow : the sub menu names with '>' on
+// the chosen one, or the line of a list level from what the state remembers
+void FMDisplay::drawMenuLevel(const MenuItem* item, int selectedChild, FullState* fullState) {
+    if (item->hasSubMenu) {
+        int pos = 0;
+        for (int k=0; k<item->maxValue; k++) {
+            fullState->menuPosition[k] = pos;
+            const char* name = MenuItemUtil::getMenuItem(item->subMenu[k])->name;
+            lcd->setCursor(pos, menuRow);
+            lcd->print(k == selectedChild ? '>' : ' ');
+            lcd->print(name);
+            pos = pos + (getLength(name) + 1);
+        }
+        return;
+    }
+    switch (item->menuState) {
+    case MENU_LOAD_SELECT_BANK:
+    case MENU_SAVE_SELECT_BANK:
+    case MENU_RENAME_SELECT_BANK:
+        displayBankSelect(fullState->preenFMBankNumber, (fullState->preenFMBank->fileType != FILE_EMPTY), fullState->preenFMBank->name);
+        break;
+    case MENU_LOAD_SELECT_COMBO:
+    case MENU_SAVE_SELECT_COMBO:
+    case MENU_RENAME_SELECT_COMBO:
+        displayBankSelect(fullState->preenFMComboNumber, (fullState->preenFMCombo->fileType != FILE_EMPTY), fullState->preenFMCombo->name);
+        break;
+    case MENU_LOAD_SELECT_DX7_BANK:
+        displayBankSelect(fullState->dx7BankNumber, (fullState->dx7Bank->fileType != FILE_EMPTY), fullState->dx7Bank->name);
+        break;
+    case MENU_CONFIG_SETTINGS:
+        lcd->setCursor(1, menuRow);
+        lcd->print(midiConfig[fullState->menuSelect].title);
+        break;
+    default:
+        // Other list levels are overwritten by their child (same row) or
+        // carry nothing worth rebuilding
+        break;
+    }
+}
+
+// Rebuilds the menu screen after the screen saver blanked it : every
+// ancestor level from the main menu down, then the current one.
+void FMDisplay::redrawMenu(FullState* fullState) {
+    const MenuItem* chain[8];
+    int depth = 0;
+    const MenuItem* item = fullState->currentMenuItem;
+    while (item != 0 && depth < 8) {
+        chain[depth++] = item;
+        if (item->menuState == MAIN_MENU) {
+            break;
+        }
+        item = MenuItemUtil::getParentMenuItem(item->menuState);
+    }
+    lcd->clearActions();
+    lcd->clear();
+    menuRow = 0;
+    // Ancestors : chain[depth-1] is the main menu
+    for (int d = depth - 1; d >= 1; d--) {
+        const MenuItem* level = chain[d];
+        const MenuItem* child = chain[d - 1];
+        menuRow += rowInc(level->menuState);
+        if (rowInc(child->menuState) != 0) {
+            // A child on the same row (name entry) overwrites this level
+            drawMenuLevel(level, MenuItemUtil::getParentMenuSelect(child->menuState), fullState);
+        }
+    }
+    // Current level, drawn the normal way
+    newMenuState(fullState);
+}
+
 void FMDisplay::newMenuState(FullState* fullState) {
+    if (unlikely(screenSaverMode || menuRedrawPending)) {
+        screenSaverMode = false;
+        menuRedrawPending = false;
+        screenSaveTimer = 0;
+        redrawMenu(fullState);
+        return;
+    }
     menuRow += rowInc(fullState->currentMenuItem->menuState);
     if (fullState->currentMenuItem->hasSubMenu) {
         int pos = 0;
@@ -1041,6 +1119,13 @@ void FMDisplay::displayPatchSelect(int presetNumber, const char* name) {
 
 
 void FMDisplay::newMenuSelect(FullState* fullState) {
+    if (unlikely(screenSaverMode)) {
+        screenSaverMode = false;
+        screenSaveTimer = 0;
+        redrawMenu(fullState);
+        return;
+    }
+    screenSaveTimer = 0;
     lcd->noCursor();
 
     switch(fullState->currentMenuItem->menuState) {
@@ -1214,6 +1299,14 @@ void FMDisplay::eraseRow(int row) {
 }
 
 void FMDisplay::menuBack(enum MenuState oldMenuState, FullState* fullState) {
+    if (unlikely(screenSaverMode)) {
+        // Blanked : the new state that follows rebuilds the whole screen
+        screenSaverMode = false;
+        menuRedrawPending = true;
+        screenSaveTimer = 0;
+        return;
+    }
+    screenSaveTimer = 0;
     if (fullState->currentMenuItem->menuState == MENU_DONE
             || fullState->currentMenuItem->menuState == MENU_ERROR
             || fullState->currentMenuItem->menuState == MENU_CANCEL) {
@@ -1281,15 +1374,13 @@ void FMDisplay::tempoClick() {
     }
     if (unlikely(synthState->fullState.midiConfigValue[MIDICONFIG_OLED_SAVER] > 0)) {
         if (!screenSaverMode) {
-            if (this->synthState->fullState.synthMode == SYNTH_MODE_EDIT) {
-                screenSaveTimer ++;
-                if (screenSaveTimer > screenSaverGoal[synthState->fullState.midiConfigValue[MIDICONFIG_OLED_SAVER] - 1]) {
-                    lcd->clearActions();
-                    lcd->clear();
-                    screenSaverMode = true;
-                    screenSaveTimer = 0;
-                }
-            } else {
+            // Edit and menu screens alike : a blanked menu is rebuilt by
+            // redrawMenu() on the next encoder or button
+            screenSaveTimer ++;
+            if (screenSaveTimer > screenSaverGoal[synthState->fullState.midiConfigValue[MIDICONFIG_OLED_SAVER] - 1]) {
+                lcd->clearActions();
+                lcd->clear();
+                screenSaverMode = true;
                 screenSaveTimer = 0;
             }
         }

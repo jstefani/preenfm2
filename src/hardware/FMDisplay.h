@@ -98,6 +98,9 @@ public:
     void newMenuState(FullState* fullState) ;
     void newMenuSelect(FullState* fullState);
 	void menuBack(enum MenuState oldMenutState, FullState* fullState);
+	// Screen saver in menu mode : rebuild the whole menu screen
+	void redrawMenu(FullState* fullState);
+	void drawMenuLevel(const MenuItem* item, int selectedChild, FullState* fullState);
 	void eraseRow(int row);
 	void displayBankSelect(int bankNumber, bool usable, const char* name);
 	void displayPatchSelect(int presetNumber, const char* name);
@@ -134,6 +137,9 @@ public:
 
     // Overide SynthParamListener
     void playNote(int timbre, char note, char velocity) {
+        if (screenSaverMode) {
+            return;
+        }
     	if (this->synthState->fullState.synthMode == SYNTH_MODE_EDIT) {
 			lcd->setCursor(0,0);
     	} else {
@@ -142,6 +148,9 @@ public:
     	lcd->print((char)7);
     }
     void stopNote(int timbre, char note) {
+        if (screenSaverMode) {
+            return;
+        }
     	if (this->synthState->fullState.synthMode == SYNTH_MODE_EDIT) {
     		lcd->setCursor(0,0);
     		lcd->print('I');
@@ -175,6 +184,8 @@ private:
 	bool algoCounterForIMInformation;
 	unsigned screenSaveTimer;
 	bool screenSaverMode;
+	// Woken up by Back while blanked : the next menu state draws everything
+	bool menuRedrawPending;
 };
 
 #endif /* FMDISPLAY_H_ */
