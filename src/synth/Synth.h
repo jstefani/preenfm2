@@ -231,6 +231,8 @@ private:
     // resets and the new patch's first block are all muted.
     volatile float muteGain;
     volatile float muteTarget;
+    // Position of the mute ramp, 0 (silent) .. 1 (open) ; muteGain is its smoothed shape
+    volatile float mutePhase;
 #ifdef CVIN
     bool cvin12Ready ;
     bool cvin34Ready ;
