@@ -916,8 +916,9 @@ void FMDisplay::newSynthMode(FullState* fullState)  {
         break;
     case SYNTH_MODE_MENU:
         refreshStatus = 0;
-        menuRow = 0;
-        newMenuState(fullState);
+        // Whole menu screen : the parent levels too, needed when this is a
+        // wake up from the screen saver inside a nested menu
+        redrawMenu(fullState);
         break;
     }
     // just in case...
