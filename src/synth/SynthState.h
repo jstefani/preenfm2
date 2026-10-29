@@ -384,7 +384,6 @@ public:
     // Screen saver : set by the display when it blanks the screen. While on,
     // the first encoder or button only wakes the display and is not acted on.
     void setScreenSaverOn(bool on) { screenSaverOn = on; }
-    bool isScreenSaverOn() { return screenSaverOn; }
     void encoderTurned(int encoder, int ticks);
     void buttonPressed(int button);
     void twoButtonsPressed(int button1, int button2);
