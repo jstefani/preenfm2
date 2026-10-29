@@ -57,6 +57,8 @@ void Synth::init(SynthState* sState) {
 
     newTimbre(0);
     this->blockCount = 0;
+    this->muteGain = 1.0f;
+    this->muteTarget = 1.0f;
     this->writeCursor = 0;
     this->readCursor = 0;
     for (int k = 0; k < MAX_NUMBER_OF_VOICES; k++) {
@@ -373,23 +375,64 @@ void Synth::buildNewSampleBlock() {
         timbres[3].fxAfterBlock(ratioTimbre);
     }
 
+    // Preset load : mute ramp on the final output
+    if (unlikely(muteGain != muteTarget || muteGain < 1.0f)) {
+        applyMuteRamp();
+    }
+
+}
+
+// 8 blocks (about 6 ms) from 1 to 0 or back, linear inside each block
+#define MUTE_RAMP_STEP 0.125f
+
+void Synth::applyMuteRamp() {
+    float g0 = muteGain;
+    float g1 = g0;
+    if (muteTarget > g0) {
+        g1 = g0 + MUTE_RAMP_STEP;
+        if (g1 > muteTarget) {
+            g1 = muteTarget;
+        }
+    } else if (muteTarget < g0) {
+        g1 = g0 - MUTE_RAMP_STEP;
+        if (g1 < muteTarget) {
+            g1 = muteTarget;
+        }
+    }
+    float dg = (g1 - g0) * (1.0f / BLOCK_SIZE);
+    for (int t = 0; t < NUMBER_OF_TIMBRES; t++) {
+        if (timbres[t].params.engine1.numberOfVoice > 0) {
+            float* sp = timbres[t].getSampleBlock();
+            float g = g0;
+            for (int k = 0; k < BLOCK_SIZE; k++) {
+                *sp++ *= g;
+                *sp++ *= g;
+                g += dg;
+            }
+        }
+    }
+    muteGain = g1;
 }
 
 void Synth::beforeNewParamsLoad(int timbre) {
     // Fade out every playing voice instead of cutting them : killNow()
     // on a ringing voice drops the output to 0 in one sample = click.
     allNoteOffQuick();
+    // And ramp the final output to silence : the per-timbre filters keep
+    // ringing after the voices are gone, their state is reset by the load,
+    // and the new patch's effect may start with a jump. The ramp back to 1
+    // happens after the load (afterNewParamsLoad / afterNewComboLoad).
+    muteTarget = 0.0f;
 
-    // Wait for the quick release to finish before touching params or
-    // voice/timbre assignment : 6 blocks of release + 1 for the voice to
-    // end itself + 1 margin, about 6 ms.
+    // Wait for the quick release (6 blocks) and the mute ramp (8 blocks)
+    // to finish before touching params or voice/timbre assignment.
     // We are in the main loop. With CS4344 the DMA IRQ keeps rendering
     // blocks on its own; with MCP4922 (PCB R5) the main loop must render
     // them, so call fillSoundBuffer() while waiting.
     // The iteration cap only protects against a hang if audio is not running.
     bool mcp4922 = (synthState->getPcbVersion() == PCB_R5);
     uint32_t blockCountStart = blockCount;
-    for (int safety = 0; safety < 1000000 && (uint32_t)(blockCount - blockCountStart) < 8; safety++) {
+    for (int safety = 0; safety < 1000000 && (muteGain > 0.0f || (uint32_t)(blockCount - blockCountStart) < 8); safety++) {
         if (mcp4922) {
             fillSoundBuffer();
         }
@@ -435,6 +478,8 @@ void Synth::afterNewParamsLoad(int timbre) {
     // values to force check lfo used
     timbres[timbre].verifyLfoUsed(ENCODER_MATRIX_SOURCE, 0.0f, 1.0f);
 
+    // Everything is in place : fade the output back in
+    muteTarget = 1.0f;
 }
 
 void Synth::afterNewComboLoad() {
@@ -466,6 +511,8 @@ void Synth::afterNewComboLoad() {
         timbres[t].verifyLfoUsed(ENCODER_MATRIX_SOURCE, 0.0f, 1.0f);
         //
     }
+    // Everything is in place : fade the output back in
+    muteTarget = 1.0f;
 }
 
 void Synth::updateNumberOfActiveTimbres() {
