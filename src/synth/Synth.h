@@ -67,6 +67,8 @@ public:
     // DX7 engine (msfa) : a DX7 voice was loaded into timbre / edited
     void newDx7Patch(int timbre, uint8_t* unpackedVoice);
     void newDx7ParamValue(int timbre, int row, int encoder, int index, int value);
+    // Output mute ramp used around preset loads (see beforeNewParamsLoad)
+    void applyMuteRamp();
     bool isPlaying();
     void buildNewSampleBlock();
     void buildNewSampleBlockMcp4922();
@@ -231,6 +233,11 @@ private:
     volatile uint32_t blockCount;
     // DX7 engine, shared by all timbres
     Dx7Engine* dx7;
+    // Output gain applied after the timbre effects : ramps to 0 before a
+    // preset load and back to 1 after, so filters ringing on, effect state
+    // resets and the new patch's first block are all muted.
+    volatile float muteGain;
+    volatile float muteTarget;
 #ifdef CVIN
     bool cvin12Ready ;
     bool cvin34Ready ;
