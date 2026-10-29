@@ -67,6 +67,7 @@ void Synth::init(SynthState* sState) {
     this->blockCount = 0;
     this->muteGain = 1.0f;
     this->muteTarget = 1.0f;
+    this->mutePhase = 1.0f;
     this->writeCursor = 0;
     this->readCursor = 0;
     for (int k = 0; k < MAX_NUMBER_OF_VOICES; k++) {
@@ -394,23 +395,34 @@ void Synth::buildNewSampleBlock() {
 
 }
 
-// 8 blocks (about 6 ms) from 1 to 0 or back, linear inside each block
-#define MUTE_RAMP_STEP 0.125f
+// Fade out over 32 blocks (about 24 ms), back in over 16 (about 12 ms).
+// A fade to silence in a few ms is a gate, and a gate on a sustained tone
+// is heard as a click whatever the patch ; 20 ms and a rounded shape is
+// what it takes to be inaudible.
+#define MUTE_RAMP_OUT_STEP (1.0f / 32.0f)
+#define MUTE_RAMP_IN_STEP (1.0f / 16.0f)
+
+// Raised cosine shape (smoothstep) of the ramp position : no corner at either end
+static inline float muteShape(float phase) {
+    return phase * phase * (3.0f - 2.0f * phase);
+}
 
 void Synth::applyMuteRamp() {
     float g0 = muteGain;
-    float g1 = g0;
-    if (muteTarget > g0) {
-        g1 = g0 + MUTE_RAMP_STEP;
-        if (g1 > muteTarget) {
-            g1 = muteTarget;
+    float p = mutePhase;
+    if (muteTarget > p) {
+        p += MUTE_RAMP_IN_STEP;
+        if (p > muteTarget) {
+            p = muteTarget;
         }
-    } else if (muteTarget < g0) {
-        g1 = g0 - MUTE_RAMP_STEP;
-        if (g1 < muteTarget) {
-            g1 = muteTarget;
+    } else if (muteTarget < p) {
+        p -= MUTE_RAMP_OUT_STEP;
+        if (p < muteTarget) {
+            p = muteTarget;
         }
     }
+    mutePhase = p;
+    float g1 = muteShape(p);
     float dg = (g1 - g0) * (1.0f / BLOCK_SIZE);
     for (int t = 0; t < NUMBER_OF_TIMBRES; t++) {
         if (timbres[t].params.engine1.numberOfVoice > 0) {
@@ -427,24 +439,22 @@ void Synth::applyMuteRamp() {
 }
 
 void Synth::beforeNewParamsLoad(int timbre) {
-    // Fade out every playing voice instead of cutting them : killNow()
-    // on a ringing voice drops the output to 0 in one sample = click.
-    allNoteOffQuick();
-    // And ramp the final output to silence : the per-timbre filters keep
-    // ringing after the voices are gone, their state is reset by the load,
-    // and the new patch's effect may start with a jump. The ramp back to 1
-    // happens after the load (afterNewParamsLoad / afterNewComboLoad).
+    // Ramp the final output to silence (about 24 ms, rounded) before
+    // anything is touched : the voices, the per-timbre filters that keep
+    // ringing after them, the effect state reset by the load, the new
+    // patch's first block. Everything happens behind the mute ; the ramp
+    // back up follows the load (afterNewParamsLoad / afterNewComboLoad).
     muteTarget = 0.0f;
 
-    // Wait for the quick release (6 blocks) and the mute ramp (8 blocks)
-    // to finish before touching params or voice/timbre assignment.
+    // Wait for the ramp to reach silence before touching params or the
+    // voice/timbre assignment.
     // We are in the main loop. With CS4344 the DMA IRQ keeps rendering
     // blocks on its own; with MCP4922 (PCB R5) the main loop must render
     // them, so call fillSoundBuffer() while waiting.
     // The iteration cap only protects against a hang if audio is not running.
     bool mcp4922 = (synthState->getPcbVersion() == PCB_R5);
     uint32_t blockCountStart = blockCount;
-    for (int safety = 0; safety < 1000000 && (muteGain > 0.0f || (uint32_t)(blockCount - blockCountStart) < 8); safety++) {
+    for (int safety = 0; safety < 1000000 && (muteGain > 0.0f || (uint32_t)(blockCount - blockCountStart) < 2); safety++) {
         if (mcp4922) {
             fillSoundBuffer();
         }
@@ -456,7 +466,7 @@ void Synth::beforeNewParamsLoad(int timbre) {
             timbres[t].setVoiceNumber(v, -1);
         }
     }
-    // Voices are silent now; make sure every one of them is reset
+    // The output is muted : the voices can be stopped outright
     allSoundOff();
 };
 
