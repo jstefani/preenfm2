@@ -721,6 +721,7 @@ SynthState::SynthState() {
     dx7Row = DX7_ROW_ENGINE;
     dx7Operator = 0;
     dx7View = 0;
+    screenSaverOn = false;
     engineRow =  0;
     // operator works for both osc and env
     oscillatorRow  = 0;
@@ -889,7 +890,21 @@ void SynthState::encoderTurnedForArpPattern(int row, int encoder, int ticks) {
     }
 }
 
+// The interaction that wakes a blanked screen is consumed : the display is
+// rebuilt as it was and nothing else happens.
+bool SynthState::wakeUpIfScreenSaverOn() {
+    if (unlikely(screenSaverOn)) {
+        screenSaverOn = false;
+        propagateNewSynthMode();
+        return true;
+    }
+    return false;
+}
+
 void SynthState::twoButtonsPressed(int button1, int button2) {
+    if (wakeUpIfScreenSaverOn()) {
+        return;
+    }
     if (unlikely(isDx7Edit() && fullState.synthMode == SYNTH_MODE_EDIT && button1 != BUTTON_BACK)) {
         // Operator copy and friends are preenfm2 features
         return;
@@ -1028,6 +1043,9 @@ void SynthState::twoButtonsPressed(int button1, int button2) {
 
 
 void SynthState::encoderTurnedWhileButtonPressed(int encoder, int ticks, int button) {
+    if (wakeUpIfScreenSaverOn()) {
+        return;
+    }
 
     if (unlikely(fullState.synthMode == SYNTH_MODE_MENU))  {
         return;
@@ -1173,6 +1191,9 @@ bool SynthState::newRandomizerValue(int encoder, int ticks) {
 
 
 void SynthState::encoderTurned(int encoder, int ticks) {
+    if (wakeUpIfScreenSaverOn()) {
+        return;
+    }
     if (fullState.synthMode == SYNTH_MODE_EDIT) {
 
         if (unlikely(isDx7Edit())) {
@@ -1765,6 +1786,9 @@ void SynthState::setCurrentInstrument(int value) {
 }
 
 void SynthState::buttonPressed(int button) {
+    if (wakeUpIfScreenSaverOn()) {
+        return;
+    }
     SynthEditMode oldSynthMode = fullState.synthMode;
     int oldCurrentRow = currentRow;
     MenuState oldMenuState = fullState.currentMenuItem->menuState;

@@ -905,6 +905,7 @@ void FMDisplay::newSynthMode(FullState* fullState)  {
     if (unlikely(screenSaverMode)) {
         screenSaverMode = false;
         screenSaveTimer = 0;
+        this->synthState->setScreenSaverOn(false);
     }
     lcd->clearActions();
     lcd->clear();
@@ -1383,6 +1384,8 @@ void FMDisplay::tempoClick() {
                 lcd->clear();
                 screenSaverMode = true;
                 screenSaveTimer = 0;
+                // The next encoder or button only wakes the display
+                this->synthState->setScreenSaverOn(true);
             }
         }
     }
@@ -1402,6 +1405,7 @@ bool FMDisplay::wakeUpFromScreenSaver() {
     if (unlikely(screenSaverMode)) {
         screenSaverMode = false;
         screenSaveTimer = 0;
+        this->synthState->setScreenSaverOn(false);
         displayPreset();
         refreshStatus = 12;
         return true;
