@@ -1,6 +1,4 @@
 /*
- * Copyright 2026 jstefani (https://github.com/jstefani) and preenfm2 contributors
- *
  * Random DX7 patch generator for the virtual "Random" DX7 bank.
  * See DX7Random.h.
  *

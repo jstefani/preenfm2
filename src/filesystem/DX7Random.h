@@ -1,6 +1,4 @@
 /*
- * Copyright 2026 jstefani (https://github.com/jstefani) and preenfm2 contributors
- *
  * Random DX7 patch generator for the virtual "Random" DX7 bank.
  *
  * This program is free software: you can redistribute it and/or modify

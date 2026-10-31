@@ -1,6 +1,4 @@
 /*
- * Copyright 2026 jstefani (https://github.com/jstefani) and preenfm2 contributors
- *
  * Edit rows for a timbre running the DX7 engine : which byte of the
  * unpacked DX7 voice (VCED, 155 bytes) each encoder of each row edits,
  * its range and how it is shown.
