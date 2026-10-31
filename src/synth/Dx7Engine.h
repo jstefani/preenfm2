@@ -1,5 +1,5 @@
 /*
- * Copyright 2026
+ * Copyright 2026 jstefani (https://github.com/jstefani) and preenfm2 contributors
  *
  * DX7 engine for the preenfm2, built on the msfa engine (see src/msfa).
  *

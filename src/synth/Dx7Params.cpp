@@ -1,5 +1,5 @@
 /*
- * Copyright 2026
+ * Copyright 2026 jstefani (https://github.com/jstefani) and preenfm2 contributors
  *
  * Edit rows for a timbre running the DX7 engine. See Dx7Params.h.
  *

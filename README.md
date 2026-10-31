@@ -1,41 +1,53 @@
-# preenfm2 firmware
+# preenfm2 firmware 2.30
 
-Ixox/preenfm2 is the official repository of the preenfm2 firmware.
+This is a maintained continuation of the [preenfm2](https://github.com/Ixox/preenfm2) firmware by Xavier Hosxe, starting at version 2.30 and based on the official 2.21b. It runs on the same hardware: flash it like any official firmware, and go back to the official one the same way.
 
-You can find here the compiled firmware, its code source and some hardware files for the PCB, MCU board and cases.
+Fixes that also make sense for the official firmware are offered upstream as pull requests.
 
-To flash the preenfm2 for the first time, [follow these instructions](https://github.com/Ixox/preenfm2/tree/master/flash)
+Binaries are attached to the [releases](https://github.com/jstefani/preenfm2/releases). The official firmware, hardware files and documentation are at [Ixox/preenfm2](https://github.com/Ixox/preenfm2) and [ixox.fr](http://ixox.fr/preenfm2/).
 
+To flash the preenfm2 for the first time, [follow these instructions](flash).
+
+## What's new in 2.30
+
+* **DX7 engine.** DX7 sysex banks play on a port of the msfa engine used by Dexed, so they sound like the original instead of being converted. See [DX7 engine](#dx7-engine) below.
+* **DX7 editing and saving** from the front panel, to standard `.syx` banks.
+* **Random DX7 banks**: `*Random*`, `*Chaos*` and `*ChaosPrc*` at the top of Load > DX7.
+* **No click on patch change**: the output is muted for a few ms around a preset load.
+* **Screen saver on menu screens**, and the control that wakes the screen is not acted on.
+* **Builds with a current arm-none-eabi-gcc** (10.x).
+
+### Known limitations
+
+* Combos only store preenfm2 patches: a part running the DX7 engine is reloaded from a combo as the converted preenfm2 patch.
+* Save > Bnk on a DX7 part stores the converted preenfm2 patch; use Save > DX7 to keep the DX7 voice.
+* The Eurorack (CV) build compiles but has not been tested on Eurorack hardware.
+
+### Upgrading from 2.21b
+
+* `Settings.txt` gains a `dx7engine` line (0 = Native, 1 = Convert). It is written the next time the settings are saved; without it the default, Native, applies.
+* Load > DX7 lists the three virtual random banks before the banks on the key. MIDI bank select still addresses the files as before.
 
 ## Compiling the firmware
 
-To compile the firmware, you'll need [arm-gcc version 4.7](https://launchpad.net/gcc-arm-embedded/+milestone/4.7-2014-q2-update)
-
-Add the bin directory to your PATH, and run **'make'**, you'll get the list of the available targets.
+You need the [Arm GNU toolchain](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads) (`arm-none-eabi-gcc`, tested with 10.3; on macOS `brew install --cask gcc-arm-embedded` or the `arm-gcc-bin@10` formula). The Makefile uses the `arm-none-eabi-gcc` found on your `PATH`; override it with `make GCC_PATH=/path/to/bin ...`.
 
 ```bash
 $ make
-You must chose a target 
+You must chose a target
 Don't forget to clean between different build targets
    clean : clean build directory
    pfm : build pfm2 firmware
-   pfmcv : build pfm2 firmware for Eurorack 
+   pfmcv : build pfm2 firmware for Eurorack
    installdfu : flash last compiled firmware through DFU
    zip : create zip with all inside
 ```
-Since some refactoring, the bootloader does not compile anymore. But it's available in its binary format.
 
-Then put your preenfm2 in [bootloader mode](http://ixox.fr/preenfm2/manual/upgrade-firmware/). Look at DFU part 4.
+`make pfm` produces `build/p2_<version>.bin`. Copy it to `/pfm2` on the USB key and flash it from the bootloader (power on while holding a button), or put the preenfm2 in [DFU mode](http://ixox.fr/preenfm2/manual/upgrade-firmware/) and run `make installdfu`.
 
-To flash the firmware on the preenfm2 using the DFU protocol :
+The bootloader is available in binary form in [flash](flash).
 
-```bash
-make installdfu
-```
-
-Once it's done, unplug the power cable and plug it back.
-
-## DX7 engine (branch dx7-msfa-engine)
+## DX7 engine
 
 DX7 sysex patches can be played by a port of the msfa engine used by Dexed
 (see `src/msfa/README.md`) instead of being converted to a preenfm2 patch.
