@@ -33,7 +33,6 @@ void Dx7Engine::init(float sampleRate) {
         voices[v].released = false;
         voices[v].heldByPedal = false;
         voices[v].index = 0;
-        voices[v].fadeBlocks = -1;
     }
     for (int t = 0; t < DX7_NUMBER_OF_TIMBRES; t++) {
         timbres[t].active = false;
@@ -82,7 +81,7 @@ void Dx7Engine::setParam(int timbre, int index, uint8_t value) {
     // Playing notes follow the edit, as on Dexed
     for (int v = 0; v < DX7_MAX_VOICES; v++) {
         Dx7Voice& voice = voices[v];
-        if (voice.timbre == timbre && voice.fadeBlocks < 0) {
+        if (voice.timbre == timbre) {
             voice.note.update(ts.patch, transposedNote(timbre, voice.midiNote), voice.velocity);
         }
     }
@@ -106,7 +105,6 @@ void Dx7Engine::deactivateTimbre(int timbre) {
 
 void Dx7Engine::freeVoice(int v) {
     voices[v].timbre = -1;
-    voices[v].fadeBlocks = -1;
     voices[v].released = false;
     voices[v].heldByPedal = false;
 }
@@ -178,7 +176,6 @@ void Dx7Engine::noteOn(int timbre, uint8_t note, uint8_t velocity, int maxVoices
     voice.velocity = velocity;
     voice.released = false;
     voice.heldByPedal = false;
-    voice.fadeBlocks = -1;
     voice.index = voiceIndex++;
     ts.lfo.keydown();
     voice.note.init(ts.patch, transposedNote(timbre, note), velocity);
@@ -222,18 +219,6 @@ void Dx7Engine::allNoteOff(int timbre) {
             voice.heldByPedal = false;
             voice.released = true;
             voice.note.keyup();
-        }
-    }
-}
-
-void Dx7Engine::allNoteOffQuick() {
-    for (int v = 0; v < DX7_MAX_VOICES; v++) {
-        Dx7Voice& voice = voices[v];
-        if (voice.timbre >= 0 && voice.fadeBlocks < 0) {
-            voice.heldByPedal = false;
-            voice.released = true;
-            voice.note.keyup();
-            voice.fadeBlocks = DX7_FADE_BLOCKS;
         }
     }
 }
@@ -292,36 +277,14 @@ int Dx7Engine::render(int timbre, float* stereoBlock) {
         }
         voice.note.compute(renderBuf, lfoVal, lfoDelay, &ts.controllers);
 
-        // Gain over the block : constant, or a linear ramp while fading out
-        float g0 = outputScale;
-        float g1 = outputScale;
-        bool fading = voice.fadeBlocks >= 0;
-        bool fadeFinished = false;
-        if (fading) {
-            const float inv = 1.0f / DX7_FADE_BLOCKS;
-            g0 = outputScale * voice.fadeBlocks * inv;
-            voice.fadeBlocks--;
-            if (voice.fadeBlocks < 0) {
-                // this block starts at 0 : the voice is done
-                g1 = 0.0f;
-                fadeFinished = true;
-            } else {
-                g1 = outputScale * voice.fadeBlocks * inv;
-            }
-        }
-        float g = g0;
-        float dg = (g1 - g0) * (1.0f / msfa::N);
         float* sp = stereoBlock;
         for (int k = 0; k < msfa::N; k++) {
-            float s = (float)renderBuf[k] * g;
+            float s = (float)renderBuf[k] * outputScale;
             *sp++ += s;
             *sp++ += s;
-            g += dg;
         }
 
-        if (fadeFinished) {
-            freeVoice(v);
-        } else if (!fading && voice.released && voice.note.carriersSilent()) {
+        if (voice.released && voice.note.carriersSilent()) {
             freeVoice(v);
         }
     }

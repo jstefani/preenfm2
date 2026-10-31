@@ -45,7 +45,6 @@ public:
     void glideToNote(short newNote);
     void killNow();
     void noteOff();
-    void noteOffQuick();
     void glideFirstNoteOff();
     void glide();
 

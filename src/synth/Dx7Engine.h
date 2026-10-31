@@ -30,8 +30,6 @@
 #define DX7_NUMBER_OF_TIMBRES 4
 #define DX7_PACKED_PATCH_SIZE 128
 #define DX7_UNPACKED_PATCH_SIZE 156
-// Blocks of linear fade used when a preset is loaded while notes ring
-#define DX7_FADE_BLOCKS 6
 
 struct Dx7Voice {
     msfa::Dx7Note note;
@@ -41,7 +39,6 @@ struct Dx7Voice {
     bool released;
     bool heldByPedal;
     uint32_t index;         // allocation order, lowest = oldest
-    int8_t fadeBlocks;      // -1 = not fading, otherwise blocks left
 };
 
 struct Dx7TimbreState {
@@ -69,8 +66,6 @@ public:
     void noteOff(int timbre, uint8_t note);
     void setHoldPedal(int timbre, bool hold);
     void allNoteOff(int timbre);
-    // Quick fade of every voice, used before a preset load
-    void allNoteOffQuick();
     void allSoundOff();
     void allSoundOff(int timbre);
     bool isPlaying();

@@ -268,44 +268,6 @@ void Voice::noteOff() {
 	}
 }
 
-// Called before a new preset is loaded.
-// Fades the voice out through the envelopes' quick release (6 blocks)
-// instead of cutting it with killNow(), which produces an audible click
-// when the voice is still ringing.
-void Voice::noteOffQuick() {
-	if (unlikely(!this->playing)) {
-		return;
-	}
-
-	if (this->newNotePlayed) {
-		// Note has not produced a single sample yet : nothing to fade
-		killNow();
-		return;
-	}
-
-	if (this->newNotePending) {
-		// Envelopes are already in quick release (noteOnWithoutPop).
-		// Just make sure the pending note never starts.
-		this->newNotePending = false;
-		this->nextPendingNote = 0;
-		this->released = true;
-		return;
-	}
-
-	this->released = true;
-	this->gliding = false;
-	this->holdedByPedal = false;
-
-	currentTimbre->env1.noteOffQuick(&envState1);
-	currentTimbre->env2.noteOffQuick(&envState2);
-	currentTimbre->env3.noteOffQuick(&envState3);
-	currentTimbre->env4.noteOffQuick(&envState4);
-	currentTimbre->env5.noteOffQuick(&envState5);
-	currentTimbre->env6.noteOffQuick(&envState6);
-
-	lfoNoteOff();
-}
-
 void Voice::killNow() {
 	this->newNotePlayed = false;
 	this->playing = false;
